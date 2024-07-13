@@ -1,0 +1,138 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>用户管理</h2>
+    <form id="user-form" method="POST" class="mb-4">
+        {{ form.hidden_tag() }}
+        <div class="mb-3">
+            {{ form.username.label(class="form-label") }}
+            {{ form.username(class="form-control", size=32) }}
+        </div>
+        <div class="mb-3">
+            {{ form.password.label(class="form-label") }}
+            {{ form.password(class="form-control", size=32) }}
+        </div>
+        <div class="mb-3">
+            {{ form.confirm.label(class="form-label") }}
+            {{ form.confirm(class="form-control", size=32) }}
+        </div>
+        <div class="mb-3">
+            {{ form.role.label(class="form-label") }}
+            {{ form.role(class="form-select") }}
+        </div>
+        <div>
+            {{ form.submit(class="btn btn-primary") }}
+        </div>
+    </form>
+
+    <h3>用户列表</h3>
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>用户名</th>
+                <th>角色</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for user in users %}
+            <tr>
+                <td>{{ user.username }}</td>
+                <td>{{ user.role }}</td>
+                <td>
+                    <!-- 编辑和删除按钮 -->
+                    <button class="btn btn-warning btn-sm" data-toggle="modal"
+                        data-target="#editUserModal"
+                        data-user-id="{{ user.id }}">编辑</button>
+                    <a href="{{ url_for('delete_user', user_id=user.id) }}"
+                        class="btn btn-danger btn-sm">删除</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- 编辑用户模态框 -->
+<div class="modal fade" id="editUserModal" tabindex="-1" role="dialog"
+    aria-labelledby="editUserModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editUserModalLabel">编辑用户</h5>
+                <button type="button" class="close" data-dismiss="modal"
+                    aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <!-- 模态框内容 -->
+                <form id="editUserForm" method="POST">
+                    {{ form.hidden_tag() }}
+                    <div class="mb-3">
+                        {{ form.username.label(class="form-label") }}
+                        {{ form.username(class="form-control", size=32) }}
+                    </div>
+                    <div class="mb-3">
+                        {{ form.password.label(class="form-label") }}
+                        {{ form.password(class="form-control", size=32) }}
+                    </div>
+                    <div class="mb-3">
+                        {{ form.confirm.label(class="form-label") }}
+                        {{ form.confirm(class="form-control", size=32) }}
+                    </div>
+                    <div class="mb-3">
+                        {{ form.role.label(class="form-label") }}
+                        {{ form.role(class="form-select") }}
+                    </div>
+                    <div>
+                        <button type="submit"
+                            class="btn btn-primary">保存更改</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    $('#editUserModal').on('show.bs.modal', function (event) {
+        var button = $(event.relatedTarget) // Button that triggered the modal
+        var userId = button.data('user-id') // Extract info from data-* attributes
+
+        // Fetch user details and populate the form in the modal
+        $.ajax({
+            url: '/get_user/' + userId,
+            method: 'GET',
+            success: function(data) {
+                // Populate the form fields with the user data
+                $('#editUserForm').find('[name="username"]').val(data.username);
+                $('#editUserForm').find('[name="role"]').val(data.role);
+                $('#editUserForm').attr('action', '/edit-user/' + userId);
+            }
+        });
+    });
+
+    $('#editUserForm').on('submit', function(e) {
+        e.preventDefault();
+
+        var form = $(this);
+        var actionUrl = form.attr('action');
+        var formData = form.serialize();
+
+        $.ajax({
+            url: actionUrl,
+            method: 'POST',
+            data: formData,
+            success: function(response) {
+                if (response.success) {
+                    location.reload(); // Refresh the page to see changes
+                } else {
+                    alert('更新失败');
+                }
+            }
+        });
+    });
+</script>
+{% endblock %}

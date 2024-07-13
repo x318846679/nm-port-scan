@@ -1,0 +1,42 @@
+{% extends "layout.html" %}
+{% block content %}
+<h1>创建新任务</h1>
+<form method="post">
+    {{ form.hidden_tag() }}
+    <div class="mb-3">
+        {{ form.name.label }}
+        {{ form.name(class="form-control") }}
+    </div>
+    <div class="mb-3">
+        {{ form.ips.label }}
+        {{ form.ips(class="form-control") }}
+    </div>
+    <div class="mb-3">
+        {{ form.params.label }}
+        {{ form.params(class="form-control") }}
+    </div>
+    <div class="mb-3">
+        {{ form.send_email.label }}
+        {{ form.send_email(class="form-check-input") }}
+    </div>
+    <div class="mb-3">
+        {{ form.email.label }}
+        {{ form.email(class="form-control") }}
+    </div>
+    <div class="mb-3">
+        {{ form.threads.label }}
+        {{ form.threads(class="form-control") }}
+    </div>
+    <div class="mb-3">
+        {{ form.schedule.label }}
+        {{ form.schedule(class="form-control") }}
+    </div>
+    <div class="mb-3">
+        {{ form.created_at.label }}
+        {{ form.created_at(class="form-control") }}
+    </div>
+    <div class="mb-3">
+        {{ form.submit(class="btn btn-primary") }}
+    </div>
+</form>
+{% endblock %}

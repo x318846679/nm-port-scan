@@ -1,0 +1,27 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>访问日志</h2>
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>用户名</th>
+                <th>登录时间</th>
+                <th>IP地址</th>
+                <th>失败登录尝试次数</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for log in logs %}
+            <tr>
+                <td>{{ log.username }}</td>
+                <td>{{ log.login_time }}</td>
+                <td>{{ log.ip_address }}</td>
+                <td>{{ log.failed_login_attempts }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

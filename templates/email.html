@@ -1,0 +1,36 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>邮箱管理</h2>
+    <form id="user-form" method="POST" class="mb-4">
+        {{ form.hidden_tag() }}
+        <div class="mb-3">
+            {{ form.host.label(class="form-label") }}
+            {{ form.host(class="form-control", size=32) }}
+        </div>
+        <div class="mb-3">
+            {{ form.port.label(class="form-label") }}
+            {{ form.port(class="form-control", size=32) }}
+        </div>
+        <div class="mb-3">
+            {{ form.user.label(class="form-label") }}
+            {{ form.user(class="form-control", size=32) }}
+        </div>
+        <div class="mb-3">
+            {{ form.passwd.label(class="form-label") }}
+            {{ form.passwd(class="form-control") }}
+        </div>
+        <div>
+            {{ form.submit(class="btn btn-primary") }}
+        </div>
+    </form>
+
+</div>
+<div class="card-body">
+    <p><strong>SMTP服务器地址:</strong> {{ email_setting.host }}</p>
+    <p><strong>SMPT服务器端口:</strong> {{ email_setting.port }}</p>
+    <p><strong>EMail账户:</strong> {{ email_setting.user }}</p>
+    <p><strong>Email密码:</strong> {{ email_setting.passwd }}</p>
+</div>
+{% endblock %}

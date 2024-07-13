@@ -1,0 +1,51 @@
+body {
+    background-color: #333;
+    /* 背景色 */
+    color: #f8f9fa;
+    /* 文字颜色 */
+    font-family: Arial, sans-serif;
+}
+
+.container {
+    max-width: 600px;
+    margin-top: 50px;
+}
+
+.alert {
+    border-radius: 0.5rem;
+    padding: 2rem;
+    background: #dc3545;
+    /* 红色背景 */
+    color: #fff;
+    /* 文字颜色 */
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+    /* 阴影效果 */
+}
+
+.alert-heading {
+    font-size: 2rem;
+    font-weight: bold;
+}
+
+.lead {
+    font-size: 1.25rem;
+}
+
+hr {
+    border-top: 1px solid #fff;
+    /* 分隔线颜色 */
+}
+
+.mb-0 {
+    margin-bottom: 0;
+}
+
+a {
+    color: #007bff;
+    /* 链接颜色 */
+}
+
+a:hover {
+    color: #0056b3;
+    /* 链接悬停颜色 */
+}

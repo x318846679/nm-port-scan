@@ -1,0 +1,175 @@
+{% extends "layout.html" %}
+{% block content %}
+<h1>任务列表</h1>
+<table class="table">
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>任务名称</th>
+            <th>IP地址</th>
+            <th>参数</th>
+            <th>邮件发送</th>
+            <th>创建时间</th>
+            <th>创建者</th> <!-- 新增列 -->
+            <th>状态</th>
+            <th>进度</th>
+            <th>定时执行</th>
+            <th>下一次执行</th>
+            <th>操作</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for task in tasks %}
+        <tr id="task-row-{{ task.id }}">
+            <td>{{ task.id }}</td>
+            <td>{{ task.name }}</td>
+            <td>
+                {% set ip_list = task.ips.split() %}
+                {% if ip_list|length > 1 %}
+                <span data-toggle="tooltip" title="{{ ip_list|join('\n') }}">
+                    {{ ip_list[0] }}等{{ ip_list|length }}个IP
+                </span>
+                {% else %}
+                {{ task.ips }}
+                {% endif %}
+            </td>
+            <td>{{ task.params }}</td>
+            <td>{{ '是' if task.send_email else '否' }}</td>
+            <td>{{ task.created_at }}</td>
+            <td>{{ task.creator.username }}</td> <!-- 显示创建者 -->
+            <td>
+                {% if task.status == 'running' %}
+                <span class="badge bg-success">运行</span>
+                {% elif task.status == 'terminated' %}
+                <span class="badge bg-danger">终止</span>
+                {% else %}
+                <span class="badge bg-secondary">未知</span>
+                {% endif %}
+            </td>
+            <td>
+                <div class="progress">
+                    <div id="progress-{{ task.id }}" class="progress-bar"
+                        role="progressbar" style="width: 0%;" aria-valuenow="0"
+                        aria-valuemin="0" aria-valuemax="100">
+                        0%
+                    </div>
+                </div>
+            </td>
+            <td>{{ task.schedule_interval }}分钟</td>
+            <td>{{ task.next_execution if task.next_execution else '无定时' }}</td>
+
+            <td>
+                <a href="{{ url_for('task_detail', task_id=task.id) }}"
+                    class="btn btn-info btn-sm">查看详情</a>
+                <button onclick="terminateTask({{ task.id }})"
+                    class="btn btn-danger btn-sm">终止</button>
+                <button onclick="executeTask({{ task.id }})"
+                    class="btn btn-primary btn-sm">执行</button>
+                <button onclick="confirmDeleteTask({{ task.id }})"
+                    class="btn btn-warning btn-sm">删除</button>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<script>
+function terminateTask(taskId) {
+    fetch(`/terminate_task/${taskId}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    }).then(response => response.json())
+      .then(data => {
+          if (data.success) {
+              alert('任务已终止');
+              location.reload();
+          } else {
+              alert('终止任务失败');
+          }
+      }).catch(error => {
+          console.error('Error:', error);
+      });
+}
+
+function executeTask(taskId) {
+    fetch(`/execute_task/${taskId}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    }).then(response => response.json())
+      .then(data => {
+          if (data.success) {
+              alert('任务已重新执行');
+              location.reload();
+          } else {
+              alert('执行任务失败');
+          }
+      }).catch(error => {
+          console.error('Error:', error);
+      });
+}
+
+function confirmDeleteTask(taskId) {
+    if (confirm('确定要删除这个任务吗？')) {
+        deleteTask(taskId);
+    }
+}
+
+function deleteTask(taskId) {
+    fetch(`/delete_task/${taskId}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    }).then(response => response.json())
+      .then(data => {
+          if (data.success) {
+              alert('任务已删除');
+              var taskRow = document.getElementById(`task-row-${taskId}`);
+              if (taskRow) {
+                  taskRow.remove();
+              } else {
+                  console.error('任务行不存在，无法删除');
+              }
+          } else {
+              alert('删除任务失败');
+          }
+      }).catch(error => {
+          console.error('Error:', error);
+      });
+}
+
+function updateProgress(taskId) {
+    fetch(`/progress/${taskId}`)
+    .then(response => response.json())
+    .then(data => {
+        const progressBar = document.getElementById(`progress-${taskId}`);
+        if (progressBar) {
+            let progress = data.progress;
+            if (progress >= 100) {
+                progress = 100; // Ensure progress is capped at 100%
+            }
+            progressBar.style.width = `${progress}%`;
+            progressBar.setAttribute('aria-valuenow', progress);
+            progressBar.textContent = `${progress.toFixed(2)}%`;
+        }
+    })
+    .catch(error => {
+        console.error('Error fetching progress:', error);
+    });
+}
+
+{% for task in tasks %}
+setInterval(() => {
+    updateProgress({{ task.id }});
+}, 1000);
+{% endfor %}
+
+$(document).ready(function(){
+    $('[data-toggle="tooltip"]').tooltip({html: true});
+});
+</script>
+{% endblock %}
