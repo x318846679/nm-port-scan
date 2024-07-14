@@ -21,6 +21,9 @@ from flask_migrate import Migrate
 from datetime import datetime, timedelta
 from apscheduler.schedulers.background import BackgroundScheduler
 
+# 确保out文件夹的存在
+if not os.path.exists("out"):
+    os.mkdir("out")
 # 添加一个全局字典来存储每个任务的进度
 task_progress = {}
 terminate_flags = {} # 用于存储每个任务的终止标志
