@@ -10,3 +10,4 @@ SQLAlchemy==1.4.40
 Werkzeug==2.2.3
 WTForms==3.0.1
 APScheduler==3.8.1
+email_validator==2.1.1

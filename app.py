@@ -26,7 +26,7 @@ task_progress = {}
 terminate_flags = {} # 用于存储每个任务的终止标志
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = '9Ooq_tlRQAtE2Z1NTdTBNsQ6RJDV1S_zc_HQcJhT4HjksO1FZys'
+app.config['SECRET_KEY'] = 'your_secret_key'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///db.sqlite'
 db = SQLAlchemy(app)
 Bootstrap(app)
@@ -156,6 +156,7 @@ def scan_udp_ports(ip, params, task_id):
                 for port in lport:
                     if nm[host][proto][port]['state'] == 'open':
                         # 检查数据库中是否已经存在相同的端口记录
+                        
                         existing_port = Port.query.filter_by(task_id=task_id, ip=ip, port=port, agree=proto).first()  # agree 协议
                         if existing_port is None:  # 如果不存在相同的端口记录
                             port_info = {
@@ -170,6 +171,17 @@ def scan_udp_ports(ip, params, task_id):
                             new_port = Port(task_id=task_id, ip=ip, port=port, name=nm[host][proto][port]['name'], agree=proto, banner=nm[host][proto][port]['product']+' '+nm[host][proto][port]['version'])
                             db.session.add(new_port)
                             db.session.commit()
+                        else:
+                            # 确保所有端口都在 open_ports ,为邮件发送用
+                            port_info = {
+                                'task_id': task_id,
+                                'ip': ip,
+                                'port': port,
+                                'name': nm[host][proto][port]['name'],
+                                'agree': proto,
+                                'banner': nm[host][proto][port]['product']+' '+nm[host][proto][port]['version'],
+                            }
+                            open_ports.append(port_info)
     
     return open_ports
 
@@ -254,7 +266,7 @@ def run_task(task_id):
         db.session.commit()
 
         df = pd.DataFrame(results)
-        filename = f"udp_port_scan_results.xlsx"
+        filename = f"./out/udp_port_scan_{task.id}_results.xlsx"
         df.to_excel(filename, index=False)
 
         if send_email_flag:
@@ -570,7 +582,7 @@ def create_default_admin():
     admin_user = User.query.filter_by(username='admin').first()
     if not admin_user:
         hashed_password = generate_password_hash('admin', method='pbkdf2:sha256')
-        new_admin = User(username='admin', password=hashed_password, role='admin')
+        new_admin = User(username='admin', password=hashed_password, role='admin',created_by=1)
         db.session.add(new_admin)
         db.session.commit()
 
