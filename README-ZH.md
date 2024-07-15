@@ -16,25 +16,21 @@ User Management: Administrators can add, edit, and delete users and set user per
 Access Records: The system records user login information and access logs to prevent malicious attacks.
 Installation Steps
 Clone the Project
-bash
-复制代码
+
 git clone https://github.com/your-username/port-scanner.git
 cd port-scanner
 Create a Virtual Environment and Install Dependencies
-bash
-复制代码
+
 python -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 Configure the Database
-bash
-复制代码
+
 flask db init
 flask db migrate
 flask db upgrade
 Run the Application
-bash
-复制代码
+
 flask run
 Usage
 Register and Login
