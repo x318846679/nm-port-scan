@@ -22,7 +22,7 @@
             {{ form.role(class="form-select") }}
         </div>
         <div>
-            {{ form.submit(class="btn btn-primary") }}
+            {{ form.submit(class="btn btn-primary", id="create-user-btn") }}
         </div>
     </form>
 
@@ -42,11 +42,11 @@
                 <td>{{ user.role }}</td>
                 <td>
                     <!-- 编辑和删除按钮 -->
-                    <button class="btn btn-warning btn-sm" data-toggle="modal"
-                        data-target="#editUserModal"
+                    <button class="btn btn-warning btn-sm edit-user-btn" 
                         data-user-id="{{ user.id }}">编辑</button>
                     <a href="{{ url_for('delete_user', user_id=user.id) }}"
-                        class="btn btn-danger btn-sm">删除</a>
+                        class="btn btn-danger btn-sm"
+                        onclick="return confirm('确定要删除这个用户吗？')">删除</a>
                 </td>
             </tr>
             {% endfor %}
@@ -55,36 +55,36 @@
 </div>
 
 <!-- 编辑用户模态框 -->
-<div class="modal fade" id="editUserModal" tabindex="-1" role="dialog"
+<div class="modal fade" id="editUserModal" tabindex="-1"
     aria-labelledby="editUserModalLabel" aria-hidden="true">
-    <div class="modal-dialog" role="document">
+    <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="editUserModalLabel">编辑用户</h5>
-                <button type="button" class="close" data-dismiss="modal"
-                    aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"
+                    aria-label="Close"></button>
             </div>
             <div class="modal-body">
                 <!-- 模态框内容 -->
                 <form id="editUserForm" method="POST">
                     {{ form.hidden_tag() }}
+                    <input type="hidden" id="edit-user-id" name="user_id">
                     <div class="mb-3">
                         {{ form.username.label(class="form-label") }}
-                        {{ form.username(class="form-control", size=32) }}
+                        {{ form.username(class="form-control", size=32, id="edit-username") }}
                     </div>
                     <div class="mb-3">
                         {{ form.password.label(class="form-label") }}
-                        {{ form.password(class="form-control", size=32) }}
+                        {{ form.password(class="form-control", size=32, id="edit-password") }}
+                        <small class="form-text text-muted">留空则不修改密码</small>
                     </div>
                     <div class="mb-3">
                         {{ form.confirm.label(class="form-label") }}
-                        {{ form.confirm(class="form-control", size=32) }}
+                        {{ form.confirm(class="form-control", size=32, id="edit-confirm") }}
                     </div>
                     <div class="mb-3">
                         {{ form.role.label(class="form-label") }}
-                        {{ form.role(class="form-select") }}
+                        {{ form.role(class="form-select", id="edit-role") }}
                     </div>
                     <div>
                         <button type="submit"
@@ -95,42 +95,89 @@
         </div>
     </div>
 </div>
+{% endblock %}
 
+{% block scripts %}
 <script>
-    $('#editUserModal').on('show.bs.modal', function (event) {
-        var button = $(event.relatedTarget) // Button that triggered the modal
-        var userId = button.data('user-id') // Extract info from data-* attributes
-
-        // Fetch user details and populate the form in the modal
-        $.ajax({
-            url: '/get_user/' + userId,
-            method: 'GET',
-            success: function(data) {
-                // Populate the form fields with the user data
-                $('#editUserForm').find('[name="username"]').val(data.username);
-                $('#editUserForm').find('[name="role"]').val(data.role);
-                $('#editUserForm').attr('action', '/edit-user/' + userId);
-            }
-        });
-    });
-
-    $('#editUserForm').on('submit', function(e) {
+    // 创建用户表单提交事件
+    $('#user-form').on('submit', function(e) {
         e.preventDefault();
-
-        var form = $(this);
-        var actionUrl = form.attr('action');
-        var formData = form.serialize();
-
+        
+        var formData = $(this).serialize();
+        
         $.ajax({
-            url: actionUrl,
+            url: '/create-user',
             method: 'POST',
             data: formData,
             success: function(response) {
                 if (response.success) {
-                    location.reload(); // Refresh the page to see changes
+                    location.reload();
                 } else {
-                    alert('更新失败');
+                    alert('创建失败: ' + (response.error || '未知错误'));
                 }
+            },
+            error: function(xhr) {
+                var errorMsg = '创建失败';
+                if (xhr.responseJSON && xhr.responseJSON.error) {
+                    errorMsg += ': ' + xhr.responseJSON.error;
+                }
+                alert(errorMsg);
+            }
+        });
+    });
+
+    // 编辑用户按钮点击事件
+    $('.edit-user-btn').on('click', function() {
+        var userId = $(this).data('user-id');
+        
+        // 获取用户信息并填充表单
+        $.ajax({
+            url: '/get_user/' + userId,
+            method: 'GET',
+            success: function(data) {
+                // 填充表单字段
+                $('#edit-user-id').val(userId);
+                $('#edit-username').val(data.username);
+                $('#edit-role').val(data.role);
+                
+                // 清空密码字段
+                $('#edit-password').val('');
+                $('#edit-confirm').val('');
+                
+                // 显示模态框
+                $('#editUserModal').modal('show');
+            },
+            error: function(xhr) {
+                alert('获取用户信息失败: ' + xhr.responseJSON.error);
+            }
+        });
+    });
+
+    // 编辑用户表单提交事件
+    $('#editUserForm').on('submit', function(e) {
+        e.preventDefault();
+        
+        var userId = $('#edit-user-id').val();
+        var formData = $(this).serialize();
+        
+        $.ajax({
+            url: '/edit-user/' + userId,
+            method: 'POST',
+            data: formData,
+            success: function(response) {
+                if (response.success !== undefined) {
+                    if (response.success) {
+                        location.reload();
+                    } else {
+                        alert('更新失败: ' + (response.error || '未知错误'));
+                    }
+                } else {
+                    // 如果返回的是页面而不是JSON，说明成功了
+                    location.reload();
+                }
+            },
+            error: function(xhr) {
+                alert('更新失败: ' + (xhr.responseJSON ? xhr.responseJSON.error : '未知错误'));
             }
         });
     });

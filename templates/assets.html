@@ -63,9 +63,11 @@
                                 <tr>
                                     <td>{{ asset.id }}</td>
                                     <td>
-                                        {% for line in asset.ip.split('\n') %}
-                                            {{ line }}<br>
-                                        {% endfor %}
+                                        <div style="max-height: 100px; overflow-y: auto;">
+                                            {% for line in asset.ip.split('\n') %}
+                                                {{ line }}<br>
+                                            {% endfor %}
+                                        </div>
                                     </td>
                                     <td>{{ asset.name }}</td>
                                     <td>{{ asset.creator.username if asset.creator else 'N/A' }}</td>
@@ -99,38 +101,35 @@ document.addEventListener('DOMContentLoaded', function() {
     const assetIdInput = document.getElementById('asset-id');
     const assetIpInput = document.getElementById('asset-ip');
     const assetNameInput = document.getElementById('asset-name');
-    const assetSubmitButton = document.getElementById('asset-submit');
+    const assetSubmit = document.getElementById('asset-submit');
     const cancelEditButton = document.getElementById('cancel-edit');
-    const assetForm = document.getElementById('asset-form');
-    
+
+    // 编辑资产
     editButtons.forEach(button => {
         button.addEventListener('click', function() {
-            const id = this.getAttribute('data-id');
-            const ip = this.getAttribute('data-ip');
-            const name = this.getAttribute('data-name');
-            
-            // 填充表单
-            assetIdInput.value = id;
-            assetIpInput.value = ip;
-            assetNameInput.value = name;
-            
-            // 更新表单标题和按钮文本
+            const assetId = this.getAttribute('data-id');
+            const assetIp = this.getAttribute('data-ip');
+            const assetName = this.getAttribute('data-name');
+
             formTitle.textContent = '编辑资产';
-            assetSubmitButton.textContent = '更新资产';
+            assetIdInput.value = assetId;
+            assetIpInput.value = assetIp;
+            assetNameInput.value = assetName;
+            assetSubmit.textContent = '更新资产';
             cancelEditButton.style.display = 'inline-block';
-            
+
             // 滚动到表单顶部
-            document.querySelector('.card').scrollIntoView({ behavior: 'smooth' });
+            document.querySelector('#asset-form').scrollIntoView({ behavior: 'smooth' });
         });
     });
-    
+
+    // 取消编辑
     cancelEditButton.addEventListener('click', function() {
-        // 重置表单
+        formTitle.textContent = '添加资产';
         assetIdInput.value = '';
         assetIpInput.value = '';
         assetNameInput.value = '';
-        formTitle.textContent = '添加资产';
-        assetSubmitButton.textContent = '添加资产';
+        assetSubmit.textContent = '添加资产';
         cancelEditButton.style.display = 'none';
     });
 });

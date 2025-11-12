@@ -97,7 +97,7 @@
                             {% endif %}
                         </div>
                         <div class="col-md-4">
-                            <h4>保持不变 ({{ diff_data.unchanged_ports|length }})</h4>
+                            <h4>保持不变的端口 ({{ diff_data.unchanged_ports|length }})</h4>
                             {% if diff_data.unchanged_ports %}
                             <table class="table table-striped">
                                 <thead>
@@ -151,28 +151,40 @@
                     <h3>端口数据</h3>
                 </div>
                 <div class="card-body">
-                    <table class="table table-striped mt-4" id="portTable">
-                        <thead>
-                            <tr>
-                                <th>IP</th>
-                                <th>协议</th>
-                                <th>端口</th>
-                                <th>服务</th>
-                                <th>Banner</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for port in ports %}
-                            <tr>
-                                <td>{{ port.ip }}</td>
-                                <td>{{ port.agree }}</td>
-                                <td>{{ port.port }}</td>
-                                <td>{{ port.name }}</td>
-                                <td>{{ port.banner }}</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+                    <div class="table-responsive">
+                        <table class="table table-striped mt-4" id="portTable">
+                            <thead>
+                                <tr>
+                                    <th>IP</th>
+                                    <th>协议</th>
+                                    <th>端口</th>
+                                    <th>服务</th>
+                                    <th>Banner</th>
+                                </tr>
+                            </thead>
+                            <tbody id="portTableBody">
+                                <!-- 数据将通过JavaScript动态加载 -->
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- 分页控件 -->
+                    <div class="d-flex justify-content-between align-items-center mt-3">
+                        <div>
+                            <span>每页显示: </span>
+                            <select id="pageSize" class="form-select d-inline w-auto">
+                                <option value="10">10</option>
+                                <option value="25" selected>25</option>
+                                <option value="50">50</option>
+                                <option value="100">100</option>
+                            </select>
+                        </div>
+                        <div>
+                            <button id="prevPage" class="btn btn-secondary">上一页</button>
+                            <span id="pageInfo" class="mx-2">第 1 页，共 1 页</span>
+                            <button id="nextPage" class="btn btn-secondary">下一页</button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -189,6 +201,10 @@ var portsData = {{ ports_data|tojson }};
 var diffData = {{ diff_data|tojson if diff_data else "{}" }};
 var historyData = {{ history_data|tojson if history_data else "[]" }};
 
+// 分页相关变量
+let currentPage = 1;
+let pageSize = 25;
+
 // 统计服务类型
 var serviceCounts = {};
 portsData.forEach(function(port) {
@@ -200,93 +216,137 @@ document.getElementById('exportButton').addEventListener('click', function() {
     XLSX.writeFile(wb, 'port_table.xlsx');
 });
 
-// 创建服务类型图表
-var serviceCtx = document.getElementById('serviceChart').getContext('2d');
-var serviceChart = new Chart(serviceCtx, {
-    type: 'pie',
-    data: {
-        labels: Object.keys(serviceCounts),
-        datasets: [{
-            data: Object.values(serviceCounts),
-            backgroundColor: [
-                'rgba(255, 99, 132, 0.2)',
-                'rgba(54, 162, 235, 0.2)',
-                'rgba(255, 206, 86, 0.2)',
-                'rgba(75, 192, 192, 0.2)',
-                'rgba(153, 102, 255, 0.2)',
-                'rgba(255, 159, 64, 0.2)'
-            ],
-            borderColor: [
-                'rgba(255, 99, 132, 1)',
-                'rgba(54, 162, 235, 1)',
-                'rgba(255, 206, 86, 1)',
-                'rgba(75, 192, 192, 1)',
-                'rgba(153, 102, 255, 1)',
-                'rgba(255, 159, 64, 1)'
-            ],
-            borderWidth: 1
-        }]
-    },
-    options: {
-        responsive: true,
-        plugins: {
-            legend: {
-                position: 'top',
-            },
-            title: {
-                display: true,
-                text: '服务类型分布'
-            }
-        }
+// 分页功能实现
+function renderTablePage() {
+    const tbody = document.getElementById('portTableBody');
+    tbody.innerHTML = '';
+    
+    const start = (currentPage - 1) * pageSize;
+    const end = start + pageSize;
+    const pageData = portsData.slice(start, end);
+    
+    pageData.forEach(function(port) {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${port.ip}</td>
+            <td>${port.agree}</td>
+            <td>${port.port}</td>
+            <td>${port.name}</td>
+            <td>${port.banner}</td>
+        `;
+        tbody.appendChild(row);
+    });
+    
+    // 更新分页信息
+    const totalPages = Math.ceil(portsData.length / pageSize);
+    document.getElementById('pageInfo').textContent = `第 ${currentPage} 页，共 ${totalPages} 页`;
+    
+    // 更新按钮状态
+    document.getElementById('prevPage').disabled = currentPage === 1;
+    document.getElementById('nextPage').disabled = currentPage === totalPages;
+}
+
+// 事件监听器
+document.getElementById('prevPage').addEventListener('click', function() {
+    if (currentPage > 1) {
+        currentPage--;
+        renderTablePage();
     }
 });
 
-// 创建趋势图表
-var trendCtx = document.getElementById('trendChart').getContext('2d');
-
-// 准备趋势数据
-var trendLabels = [];
-var trendData = [];
-
-// 添加历史数据
-historyData.forEach(function(history) {
-    trendLabels.unshift(history.created_at);
-    trendData.unshift(history.port_count);
+document.getElementById('nextPage').addEventListener('click', function() {
+    const totalPages = Math.ceil(portsData.length / pageSize);
+    if (currentPage < totalPages) {
+        currentPage++;
+        renderTablePage();
+    }
 });
 
-// 添加当前数据
-trendLabels.push("{{ task.created_at }}");
-trendData.push(portsData.length);
+document.getElementById('pageSize').addEventListener('change', function() {
+    pageSize = parseInt(this.value);
+    currentPage = 1;
+    renderTablePage();
+});
 
-var trendChart = new Chart(trendCtx, {
-    type: 'line',
-    data: {
-        labels: trendLabels,
-        datasets: [{
-            label: '端口数量',
-            data: trendData,
-            borderColor: 'rgb(75, 192, 192)',
-            backgroundColor: 'rgba(75, 192, 192, 0.2)',
-            tension: 0.1,
-            fill: false
-        }]
-    },
-    options: {
-        responsive: true,
-        plugins: {
-            legend: {
-                position: 'top',
+// 初始化图表
+document.addEventListener('DOMContentLoaded', function() {
+    // 初始化表格分页
+    renderTablePage();
+    
+    // 创建服务类型分布饼图
+    if (Object.keys(serviceCounts).length > 0) {
+        const serviceCtx = document.getElementById('serviceChart').getContext('2d');
+        const serviceChart = new Chart(serviceCtx, {
+            type: 'pie',
+            data: {
+                labels: Object.keys(serviceCounts),
+                datasets: [{
+                    data: Object.values(serviceCounts),
+                    backgroundColor: [
+                        'rgba(255, 99, 132, 0.8)',
+                        'rgba(54, 162, 235, 0.8)',
+                        'rgba(255, 205, 86, 0.8)',
+                        'rgba(75, 192, 192, 0.8)',
+                        'rgba(153, 102, 255, 0.8)',
+                        'rgba(255, 159, 64, 0.8)',
+                        'rgba(199, 199, 199, 0.8)'
+                    ],
+                    borderWidth: 1
+                }]
             },
-            title: {
-                display: true,
-                text: '端口变化趋势'
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                    },
+                    title: {
+                        display: true,
+                        text: '服务类型分布'
+                    }
+                }
             }
-        },
-        scales: {
-            y: {
-                beginAtZero: true
+        });
+    }
+    
+    // 创建端口变化趋势图
+    if (historyData.length > 0) {
+        // 准备趋势图数据
+        const trendLabels = historyData.map(item => item.created_at);
+        const trendData = historyData.map(item => item.port_count);
+        
+        const trendCtx = document.getElementById('trendChart').getContext('2d');
+        const trendChart = new Chart(trendCtx, {
+            type: 'line',
+            data: {
+                labels: trendLabels,
+                datasets: [{
+                    label: '端口数量',
+                    data: trendData,
+                    borderColor: 'rgb(75, 192, 192)',
+                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                    tension: 0.1,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                    },
+                    title: {
+                        display: true,
+                        text: '端口变化趋势'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
             }
-        }
+        });
     }
 });
 </script>

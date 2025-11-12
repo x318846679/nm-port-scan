@@ -1,10 +1,9 @@
 from functools import wraps
-from flask import Flask, render_template, redirect, url_for, session, request, flash
+from flask import Flask, render_template, redirect, url_for, session, request
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf import FlaskForm
 from wtforms import StringField, TextAreaField, PasswordField, SubmitField, BooleanField, IntegerField, SelectField, DateTimeField
 from wtforms.validators import DataRequired, Email, EqualTo
-from wtforms import ValidationError
 from werkzeug.security import generate_password_hash, check_password_hash
 import nmap
 import pandas as pd
@@ -134,288 +133,269 @@ class LoginForm(FlaskForm):
     password = PasswordField('密码', validators=[DataRequired()])
     submit = SubmitField('登录')
 
-class ChangePasswordForm(FlaskForm):
-    old_password = PasswordField('旧密码', validators=[DataRequired()])
-    new_password = PasswordField('新密码', validators=[DataRequired()])
-    confirm_password = PasswordField('确认新密码', validators=[DataRequired()])
-    submit = SubmitField('修改密码')
-    
-    def validate_new_password(self, field):
-        if len(field.data) < 8:
-            raise ValidationError('密码长度至少8位')
-        if not any(c.isupper() for c in field.data):
-            raise ValidationError('密码必须包含至少一个大写字母')
-        if not any(c.islower() for c in field.data):
-            raise ValidationError('密码必须包含至少一个小写字母')
-        if not any(c.isdigit() for c in field.data):
-            raise ValidationError('密码必须包含至少一个数字')
-    
-    def validate_confirm_password(self, field):
-        if field.data != self.new_password.data:
-            raise ValidationError('两次输入的密码不一致')
-
-
 class TaskForm(FlaskForm):
     name = StringField('任务名称', validators=[DataRequired()])
-    ips = TextAreaField('IP地址(多个IP用换行分隔)', validators=[DataRequired()], render_kw={"rows": 5})
-    params = StringField('扫描参数', default='-p- -sV -sT -sU --min-rate=1000', validators=[DataRequired()])
+    asset = SelectField('选择资产', coerce=int)
+    ips = TextAreaField('或手动输入IP地址(多个IP请换行分隔)')
+    template = SelectField('选择参数模板', coerce=int)
+    params = StringField('或手动输入Nmap参数', default='-p- -sV -sT -sU --min-rate=1000')
     send_email = BooleanField('发送邮件')
-    email = StringField('邮箱地址', validators=[Email()])
+    email = StringField('目标邮箱', default='123456@qq.com', validators=[Email()])
     threads = IntegerField('线程数', default=20)
-    schedule = IntegerField('任务间隔(分钟，0表示只执行一次)', default=0)
-    asset = SelectField('选择资产', coerce=int, validators=[DataRequired()])
-    template = SelectField('选择模板', coerce=int, validators=[DataRequired()])
-    submit = SubmitField('创建任务')
+    schedule = IntegerField('执行间隔（分钟）', default=0)  # 移除 DataRequired() 验证器
+    created_at = DateTimeField('创建时间', default=datetime.now(), format='%Y-%m-%d %H:%M:%S', render_kw={'readonly': True})
+    submit = SubmitField('开始任务')
 
-
+# 添加资产管理表单，支持多行IP
 class AssetForm(FlaskForm):
+    ip = TextAreaField('IP地址(多个IP请换行分隔)', validators=[DataRequired()])
     name = StringField('资产名称', validators=[DataRequired()])
-    ip = TextAreaField('IP地址(多个IP用换行分隔)', validators=[DataRequired()], render_kw={"rows": 5})
-    submit = SubmitField('保存资产')
+    submit = SubmitField('添加资产')
 
-
+# 添加参数模板表单
 class ScanTemplateForm(FlaskForm):
     name = StringField('模板名称', validators=[DataRequired()])
-    params = StringField('扫描参数', validators=[DataRequired()])
-    description = TextAreaField('描述', render_kw={"rows": 3})
+    params = StringField('Nmap参数', validators=[DataRequired()], default='-p- -sV -sT -sU --min-rate=1000')
+    description = TextAreaField('描述')
     submit = SubmitField('保存模板')
 
-
+# 邮箱管理
 class EmailForm(FlaskForm):
-    host = StringField('SMTP服务器', validators=[DataRequired()])
-    port = IntegerField('端口', validators=[DataRequired()])
-    user = StringField('用户名', validators=[DataRequired()])
-    passwd = PasswordField('密码', validators=[DataRequired()])
-    submit = SubmitField('保存配置')
+    host = StringField('SMTP服务器地址',  default='smtp.qq.com', validators=[DataRequired()])
+    port = IntegerField('SMTP服务器端口', default=25, validators=[DataRequired()])
+    user = StringField('Email账户', validators=[DataRequired()])
+    passwd = StringField('Email密码', validators=[DataRequired()])
+    submit = SubmitField('修改')
 
-
+# 用户管理
 class UserForm(FlaskForm):
     username = StringField('用户名', validators=[DataRequired()])
-    password = PasswordField('密码')
-    confirm = PasswordField('确认密码', validators=[EqualTo('password', message='密码必须匹配')])
-    role = SelectField('角色', choices=[('user', '普通用户'), ('admin', '管理员')], validators=[DataRequired()])
-    submit = SubmitField('保存用户')
-    
-    def validate_username(self, field):
-        # 检查用户名是否已存在
-        user = User.query.filter_by(username=field.data).first()
-        if user:
-            raise ValidationError('用户名已存在')
+    password = PasswordField('密码', validators=[DataRequired(), EqualTo('confirm', message='Passwords must match')])
+    confirm = PasswordField('重复密码')
+    role = SelectField('角色', choices=[('user', 'User'), ('admin', 'Admin')], default='user')
+    submit = SubmitField('提交')
+
+                    
+def log_access(username, failed_login_attempts=0):
+    ip_address = request.remote_addr
+    request_url = request.path
+    log_entry = AccessLog(username=username, ip_address=ip_address, failed_login_attempts=failed_login_attempts, request_url=request_url)
+    db.session.add(log_entry)
+    db.session.commit()
 
 
 def is_admin():
     return session.get('role') == 'admin'
 
 
-def log_access(username):
-    """记录用户登录日志"""
-    ip_address = request.remote_addr
-    access_log = AccessLog.query.filter_by(username=username, ip_address=ip_address).first()
-    if access_log:
-        access_log.failed_login_attempts = 0  # 重置失败次数
-        access_log.login_time = datetime.now()
-    else:
-        access_log = AccessLog(
-            username=username,
-            ip_address=ip_address,
-            failed_login_attempts=0,
-            request_url=request.path,
-            login_time=datetime.now()
-        )
-        db.session.add(access_log)
-    db.session.commit()
+def scan_udp_ports(ip, params, task_id):
+    if terminate_flags[task_id]:  # 检查终止标志
+        return []
+    
+    nm = nmap.PortScanner()
+    nm.scan(ip, arguments=params)
+    
+    open_ports = []
+    
+    with app.app_context():  # 确保在应用上下文内运行
+        for host in nm.all_hosts():
+            if terminate_flags[task_id]:  # 检查终止标志
+                return []
+            for proto in nm[host].all_protocols():
+                lport = nm[host][proto].keys()
+                for port in lport:
+                    if nm[host][proto][port]['state'] == 'open':
+                        # 检查数据库中是否已经存在相同的端口记录
+                        
+                        existing_port = Port.query.filter_by(task_id=task_id, ip=ip, port=port, agree=proto).first()  # agree 协议
+                        if existing_port is None:  # 如果不存在相同的端口记录
+                            port_info = {
+                                'task_id': task_id,
+                                'ip': ip,
+                                'port': port,
+                                'name': nm[host][proto][port]['name'],
+                                'agree': proto,
+                                'banner': nm[host][proto][port]['product']+' '+nm[host][proto][port]['version'],
+                            }
+                            open_ports.append(port_info)
+                            new_port = Port(task_id=task_id, ip=ip, port=port, name=nm[host][proto][port]['name'], agree=proto, banner=nm[host][proto][port]['product']+' '+nm[host][proto][port]['version'])
+                            db.session.add(new_port)
+                            db.session.commit()
+                        else:
+                            # 确保所有端口都在 open_ports ,为邮件发送用
+                            port_info = {
+                                'task_id': task_id,
+                                'ip': ip,
+                                'port': port,
+                                'name': nm[host][proto][port]['name'],
+                                'agree': proto,
+                                'banner': nm[host][proto][port]['product']+' '+nm[host][proto][port]['version'],
+                            }
+                            open_ports.append(port_info)
+    
+    return open_ports
 
+def run_task(task_id):
+    with app.app_context():
+        task = Task.query.get(task_id)
+        # 如果是定时任务，获取最新的资产IP
+        if task.is_scheduled:
+            # 查找关联的资产（通过任务名称匹配资产名称）
+            asset = Asset.query.filter_by(name=task.name, created_by=task.created_by).first()
+            if asset:
+                # 更新任务的IP为资产的最新IP
+                task.ips = asset.ip
+                db.session.commit()
+        
+        # 处理IP列表，支持多行IP输入
+        ip_list = []
+        for line in task.ips.split('\n'):
+            ips = line.strip().split()
+            ip_list.extend(ips)
+        
+        ips = list(set(ip_list))  # 去重
+        params = task.params
+        threads = task.threads
+        send_email_flag = task.send_email
+        target_email = task.email
+
+        results = []
+
+        # 开始任务，更新状态为运行中
+        task.progress = 0
+        task.status = 'running'
+        db.session.commit()
+
+        terminate_flags[task_id] = False
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=threads) as executor:
+            future_to_ip = {executor.submit(scan_udp_ports, ip, params, task_id): ip for ip in ips}
+            total_ips = len(ips)
+            completed_ips = 0
+
+            for future in concurrent.futures.as_completed(future_to_ip):
+                if terminate_flags[task_id]:
+                    break
+
+                ip = future_to_ip[future]
+                try:
+                    data = future.result()
+                    results.extend(data)
+                except Exception as exc:
+                    print(f"{ip} generated an exception: {exc}")
+                
+                completed_ips += 1
+                task.progress = (completed_ips / total_ips) * 100
+                db.session.commit()
+
+        # 完成任务，更新状态为完成
+        task.status = 'completed' if not terminate_flags[task_id] else 'terminated'
+        db.session.commit()
+
+        df = pd.DataFrame(results)
+        filename = f"./out/udp_port_scan_{task.id}_results.xlsx"
+        df.to_excel(filename, index=False)
+
+        if send_email_flag:
+            # 统计扫描结果
+            total_ports = len(results)
+            unique_ips = len(set([r['ip'] for r in results]))
+            
+            email_subject = f"任务 {task.name} 执行完成"
+            email_body = f"""
+            <html>
+            <body>
+                <h2>端口扫描任务完成通知</h2>
+                <p><strong>任务名称:</strong> {task.name}</p>
+                <p><strong>执行时间:</strong> {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
+                <p><strong>扫描参数:</strong> {task.params}</p>
+                <p><strong>扫描IP数量:</strong> {len(ips)}</p>
+                <p><strong>发现开放端口数量:</strong> {total_ports}</p>
+                <p><strong>涉及IP数量:</strong> {unique_ips}</p>
+                <p>详细结果请查看附件中的Excel文件。</p>
+            </body>
+            </html>
+            """
+            send_email(target_email, email_subject, email_body, filename)
+
+        print(f"Task {task.name} completed")
+
+
+def send_email(to_email, subject, body, attachment):
+    email_settings = ZEmail.query.first()
+    from_email = email_settings.user
+    password = email_settings.passwd
+    
+    if not os.path.exists(attachment):
+        print(f"Attachment {attachment} does not exist, cannot send email.")
+        return
+
+    msg = MIMEMultipart()
+    msg['From'] = from_email
+    msg['To'] = to_email
+    msg['Subject'] = subject
+
+    msg.attach(MIMEText(body, 'html'))
+
+    part = MIMEBase('application', 'octet-stream')
+    try:
+        with open(attachment, 'rb') as file:
+            part.set_payload(file.read())
+    except FileNotFoundError as e:
+        print(f"Error reading attachment: {e}")
+        return
+
+    encoders.encode_base64(part)
+    part.add_header('Content-Disposition', f'attachment; filename= {os.path.basename(attachment)}')
+    msg.attach(part)
+
+    try:
+        server = smtplib.SMTP(email_settings.host, int(email_settings.port))
+        server.starttls()
+        server.login(from_email, password)
+        server.sendmail(from_email, to_email, msg.as_string())
+        server.quit()
+        print("Email sent successfully")
+    except Exception as e:
+        print(f"Error sending email: {e}")
+
+def calculate_next_run(schedule):
+    return schedule + timedelta(hours=24)  # Example: Next run in 24 hours
 
 def clean_expired_blocks():
-    """清理过期的封禁记录"""
-    expired_logs = AccessLog.query.filter(AccessLog.block_until < datetime.now()).all()
-    for log in expired_logs:
-        db.session.delete(log)
-    db.session.commit()
-
-
-# 路由装饰器
+    with app.app_context():
+        now = datetime.now()
+        expired_logs = AccessLog.query.filter(AccessLog.block_until < now).all()
+        for log in expired_logs:
+            log.block_until = None
+            log.failed_login_attempts = 0
+        db.session.commit()
+        
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if 'logged_in' not in session:
+        if not session.get('logged_in'):
+            ip_address = request.remote_addr
+            access_log = AccessLog.query.filter_by(ip_address=ip_address).first()
+            if access_log and access_log.block_until and datetime.now() < access_log.block_until:
+                return redirect(url_for('attack_warning'))  # 封禁时间未到，跳转到警告页面
+            
             return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorated_function
 
 
-def run_task(task_id):
-    """执行扫描任务"""
-    # 获取任务
-    task = Task.query.get(task_id)
-    if not task:
-        return
-
-    # 更新任务状态
-    task.status = 'running'
-    db.session.commit()
-
-    # 初始化nmap扫描器
-    nm = nmap.PortScanner()
-    
-    # 分割IP地址
-    ips = task.ips.split('\n')
-    total_ips = len(ips)
-    scanned_ips = 0
-    
-    try:
-        # 执行扫描
-        for ip in ips:
-            ip = ip.strip()
-            if not ip:
-                continue
-                
-            if terminate_flags.get(task_id, False):
-                task.status = 'stopped'
-                db.session.commit()
-                return
-                
-            try:
-                nm.scan(ip, arguments=task.params)
-                
-                # 保存扫描结果
-                for host in nm.all_hosts():
-                    if terminate_flags.get(task_id, False):
-                        task.status = 'stopped'
-                        db.session.commit()
-                        return
-                        
-                    for proto in nm[host].all_protocols():
-                        if terminate_flags.get(task_id, False):
-                            task.status = 'stopped'
-                            db.session.commit()
-                            return
-                            
-                        lport = nm[host][proto].keys()
-                        for port in lport:
-                            if terminate_flags.get(task_id, False):
-                                task.status = 'stopped'
-                                db.session.commit()
-                                return
-                                
-                            # 获取端口信息
-                            port_info = nm[host][proto][port]
-                            new_port = Port(
-                                task_id=task.id,
-                                ip=host,
-                                port=port,
-                                name=port_info.get('name', ''),
-                                agree=proto,
-                                banner=port_info.get('product', '') + ' ' + port_info.get('version', '')
-                            )
-                            db.session.add(new_port)
-                            
-                scanned_ips += 1
-                task.progress = (scanned_ips / total_ips) * 100
-                db.session.commit()
-                
-            except Exception as e:
-                print(f"扫描 {ip} 时出错: {e}")
-                continue
-                
-        # 完成任务
-        task.status = 'completed'
-        task.progress = 100
-        db.session.commit()
-        
-        # 发送邮件（如果需要）
-        if task.send_email and task.email:
-            try:
-                send_email_notification(task)
-            except Exception as e:
-                print(f"发送邮件通知时出错: {e}")
-                
-    except Exception as e:
-        task.status = 'failed'
-        db.session.commit()
-        print(f"执行任务 {task_id} 时出错: {e}")
-
-
-def send_email_notification(task):
-    """发送邮件通知"""
-    # 获取邮箱配置
-    email_settings = ZEmail.query.first()
-    if not email_settings:
-        return
-        
-    # 创建邮件
-    msg = MIMEMultipart()
-    msg['From'] = email_settings.user
-    msg['To'] = task.email
-    msg['Subject'] = f'端口扫描任务完成: {task.name}'
-    
-    # 邮件正文
-    body = f"""
-    任务名称: {task.name}
-    扫描时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-    扫描IP数量: {len(task.ips.split())}
-    
-    详细结果请登录系统查看。
-    """
-    msg.attach(MIMEText(body, 'plain'))
-    
-    # 附加Excel文件
-    try:
-        ports = Port.query.filter_by(task_id=task.id).all()
-        if ports:
-            df = pd.DataFrame([{
-                'IP': p.ip,
-                '端口': p.port,
-                '服务': p.name,
-                '协议': p.agree,
-                'Banner': p.banner
-            } for p in ports])
-            
-            excel_file = f"out/{task.name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-            df.to_excel(excel_file, index=False)
-            
-            with open(excel_file, "rb") as attachment:
-                part = MIMEBase('application', 'octet-stream')
-                part.set_payload(attachment.read())
-                
-            encoders.encode_base64(part)
-            part.add_header(
-                'Content-Disposition',
-                f'attachment; filename= {os.path.basename(excel_file)}'
-            )
-            msg.attach(part)
-    except Exception as e:
-        print(f"附加Excel文件时出错: {e}")
-    
-    # 发送邮件
-    server = smtplib.SMTP(email_settings.host, int(email_settings.port))
-    server.starttls()
-    server.login(email_settings.user, email_settings.passwd)
-    server.sendmail(email_settings.user, task.email, msg.as_string())
-    server.quit()
-
-
-# 路由定义
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     form = LoginForm()
     if form.validate_on_submit():
         user = User.query.filter_by(username=form.username.data).first()
         if user and check_password_hash(user.password, form.password.data):
-            # 检查是否使用默认密码登录
-            default_password_hash = generate_password_hash('admin')
-            is_default_password = check_password_hash(default_password_hash, form.password.data) and user.username == 'admin'
-            
             session['logged_in'] = True
             session['user_id'] = user.id
             session['username'] = user.username
             session['role'] = user.role
             log_access(user.username)  # 记录成功登录
-            
-            # 如果是使用默认密码登录，要求修改密码
-            if is_default_password:
-                return redirect(url_for('change_password'))
-                
             return redirect(url_for('index'))
         else:
             ip_address = request.remote_addr
@@ -434,44 +414,28 @@ def login():
                 
     return render_template('login.html', form=form)
 
-
-@app.route('/change-password', methods=['GET', 'POST'])
-@login_required
-def change_password():
-    form = ChangePasswordForm()
-    if form.validate_on_submit():
-        user = User.query.get(session['user_id'])
-        if user:
-            # 验证旧密码
-            if check_password_hash(user.password, form.old_password.data):
-                # 检查新密码强度
-                new_password = form.new_password.data
-                if len(new_password) < 8:
-                    flash('密码长度至少8位', 'error')
-                elif not any(c.isupper() for c in new_password):
-                    flash('密码必须包含至少一个大写字母', 'error')
-                elif not any(c.islower() for c in new_password):
-                    flash('密码必须包含至少一个小写字母', 'error')
-                elif not any(c.isdigit() for c in new_password):
-                    flash('密码必须包含至少一个数字', 'error')
-                else:
-                    # 更新密码
-                    user.password = generate_password_hash(new_password)
-                    db.session.commit()
-                    flash('密码修改成功', 'success')
-                    return redirect(url_for('index'))
-            else:
-                flash('旧密码错误', 'error')
-        else:
-            flash('用户不存在', 'error')
+# 错误页面引导
+@app.errorhandler(404)
+def page_not_found(e):
+    ip_address = request.remote_addr
+    request_url = request.path
+    log_entry = AccessLog(
+        username='Anonymous',  # 或者使用适当的标识符
+        ip_address=ip_address,
+        failed_login_attempts=0,  # 可以设置为0，因为404错误通常不是登录失败
+        request_url=request_url,
+        login_time=datetime.now()
+    )
+    db.session.add(log_entry)
+    db.session.commit()
     
-    return render_template('change_password.html', form=form)
+    # 返回自定义的404错误页面或响应
+    return redirect(url_for('login'))
 
 
 @app.route('/attack_warning')
 def attack_warning():
     return render_template('attack_warning.html')
-
 
 @app.route('/logout')
 @login_required
@@ -621,7 +585,6 @@ def index():
 @app.route('/tasks')
 @login_required
 def task_list():
-    # 显示所有任务列表
     if session.get('role') == 'admin':
         tasks = Task.query.all()
     else:
@@ -629,67 +592,189 @@ def task_list():
     return render_template('task_list.html', tasks=tasks)
 
 
-@app.route('/task/<int:task_id>')
+@app.route('/execute_task/<int:task_id>', methods=['POST'])
 @login_required
-def task_detail(task_id):
-    # 显示特定任务的详细信息
-    task = Task.query.get_or_404(task_id)
+def execute_task(task_id):
+    task = Task.query.get(task_id)
+    if not task:
+        return jsonify({'success': False, 'error': '任务不存在'}), 404
     
-    # 检查权限：管理员可以查看所有任务，普通用户只能查看自己的任务
+    # 检查用户权限（普通用户只能执行自己创建的任务，管理员可以执行所有任务）
     if session.get('role') != 'admin' and task.created_by != session['user_id']:
-        return redirect(url_for('task_list'))
+        return jsonify({'success': False, 'error': '权限不足'}), 403
     
-    # 获取任务相关的端口数据
-    ports = Port.query.filter_by(task_id=task_id).all()
+    # 启动新线程执行任务
+    threading.Thread(target=run_task, args=(task_id,)).start()
     
-    # 将端口数据按IP分组
-    ports_by_ip = {}
-    for port in ports:
-        if port.ip not in ports_by_ip:
-            ports_by_ip[port.ip] = []
-        ports_by_ip[port.ip].append(port)
-    
-    return render_template('task_detail.html', task=task, ports_by_ip=ports_by_ip)
+    return jsonify({'success': True})
 
 
-@app.route('/delete_task/<int:task_id>', methods=['POST'])
+@app.route('/terminate_task/<int:task_id>', methods=['POST'])
 @login_required
-def delete_task(task_id):
-    task = Task.query.get_or_404(task_id)
+def terminate_task(task_id):
+    task = Task.query.get(task_id)
+    if not task:
+        return jsonify({'success': False, 'error': '任务不存在'}), 404
     
-    # 检查权限：管理员可以删除所有任务，普通用户只能删除自己的任务
+    # 检查用户权限（普通用户只能终止自己创建的任务，管理员可以终止所有任务）
     if session.get('role') != 'admin' and task.created_by != session['user_id']:
-        return redirect(url_for('task_list'))
-    
-    # 删除任务相关的端口数据
-    ports = Port.query.filter_by(task_id=task_id).all()
-    for port in ports:
-        db.session.delete(port)
-    
-    # 删除任务
-    db.session.delete(task)
-    db.session.commit()
-    
-    return redirect(url_for('task_list'))
-
-
-@app.route('/stop_task/<int:task_id>', methods=['POST'])
-@login_required
-def stop_task(task_id):
-    task = Task.query.get_or_404(task_id)
-    
-    # 检查权限：管理员可以停止所有任务，普通用户只能停止自己的任务
-    if session.get('role') != 'admin' and task.created_by != session['user_id']:
-        return redirect(url_for('task_list'))
+        return jsonify({'success': False, 'error': '权限不足'}), 403
     
     # 设置终止标志
     terminate_flags[task_id] = True
     
     # 更新任务状态
-    task.status = 'stopped'
+    task.status = 'terminated'
     db.session.commit()
     
-    return redirect(url_for('task_list'))
+    return jsonify({'success': True})
+
+
+@app.route('/progress/<int:task_id>')
+@login_required
+def get_progress(task_id):
+    # 首先检查数据库中的进度
+    task = Task.query.get(task_id)
+    if task:
+        return jsonify({'progress': task.progress})
+    
+    # 如果数据库中没有找到任务，返回错误
+    return jsonify({'error': 'Task not found'}), 404
+
+
+@app.route('/task/<int:task_id>')
+@login_required
+def task_detail(task_id):
+    task = Task.query.get(task_id)
+    if not task:
+        return redirect(url_for('task_list'))
+    ports = Port.query.filter_by(task_id=task_id).all()
+    
+    # 将Port对象转换为字典列表，以便JSON序列化
+    ports_data = []
+    for port in ports:
+        ports_data.append({
+            'id': port.id,
+            'ip': port.ip,
+            'port': port.port,
+            'name': port.name,
+            'agree': port.agree,
+            'banner': port.banner
+        })
+    
+    # 获取历史执行记录用于趋势分析
+    task_history = []
+    if task.asset_id:
+        # 如果任务关联了资产，获取同一资产的历史扫描记录
+        task_history = Task.query.filter(
+            Task.asset_id == task.asset_id
+        ).order_by(Task.created_at.desc()).all()
+    else:
+        # 如果没有关联资产，获取同名任务的历史记录
+        task_history = Task.query.filter(
+            Task.name == task.name,
+            Task.created_by == task.created_by
+        ).order_by(Task.created_at.desc()).all()
+    
+    # 获取历史端口数据用于趋势分析
+    history_data = []
+    for history_task in task_history:
+        port_count = Port.query.filter_by(task_id=history_task.id).count()
+        history_data.append({
+            'id': history_task.id,
+            'name': history_task.name,
+            'created_at': history_task.created_at.strftime('%Y-%m-%d %H:%M:%S') if history_task.created_at else None,
+            'port_count': port_count
+        })
+    
+    # 如果任务关联了资产，获取上一次扫描结果进行对比
+    diff_data = None
+    if task.asset_id:
+        # 获取同一资产的上一次扫描任务（排除当前任务）
+        previous_task = Task.query.filter(
+            Task.asset_id == task.asset_id,
+            Task.created_at < task.created_at,
+            Task.id != task.id
+        ).order_by(Task.created_at.desc()).first()
+        
+        if previous_task:
+            diff_data = compare_tasks(previous_task, task)
+    else:
+        # 如果没有关联资产，查找创建时间早于当前任务的上一次执行记录
+        previous_task = None
+        for hist_task in task_history:
+            if hist_task.id != task.id:
+                previous_task = hist_task
+                break
+                
+        if previous_task:
+            diff_data = compare_tasks(previous_task, task)
+    
+    return render_template('task_detail.html', task=task, ports=ports, ports_data=ports_data, diff_data=diff_data, history_data=history_data)
+
+
+def compare_tasks(previous_task, current_task):
+    """比较两个任务的端口扫描结果"""
+    # 获取两个任务的端口数据
+    previous_ports = Port.query.filter_by(task_id=previous_task.id).all()
+    current_ports = Port.query.filter_by(task_id=current_task.id).all()
+    
+    # 对比数据
+    previous_ports_set = set((p.ip, p.port, p.agree) for p in previous_ports)
+    current_ports_set = set((p.ip, p.port, p.agree) for p in current_ports)
+    
+    # 找出新增和减少的端口
+    added_ports = current_ports_set - previous_ports_set
+    removed_ports = previous_ports_set - current_ports_set
+    unchanged_ports = current_ports_set.intersection(previous_ports_set)
+    
+    # 将Port对象转换为字典
+    added_ports_data = []
+    for p in current_ports:
+        if (p.ip, p.port, p.agree) in added_ports:
+            added_ports_data.append({
+                'id': p.id,
+                'ip': p.ip,
+                'port': p.port,
+                'name': p.name,
+                'agree': p.agree,
+                'banner': p.banner
+            })
+    
+    removed_ports_data = []
+    for p in previous_ports:
+        if (p.ip, p.port, p.agree) in removed_ports:
+            removed_ports_data.append({
+                'id': p.id,
+                'ip': p.ip,
+                'port': p.port,
+                'name': p.name,
+                'agree': p.agree,
+                'banner': p.banner
+            })
+            
+    unchanged_ports_data = []
+    for p in current_ports:
+        if (p.ip, p.port, p.agree) in unchanged_ports:
+            unchanged_ports_data.append({
+                'id': p.id,
+                'ip': p.ip,
+                'port': p.port,
+                'name': p.name,
+                'agree': p.agree,
+                'banner': p.banner
+            })
+    
+    return {
+        'previous_task': {
+            'id': previous_task.id,
+            'name': previous_task.name,
+            'created_at': previous_task.created_at.strftime('%Y-%m-%d %H:%M:%S') if previous_task.created_at else None
+        },
+        'added_ports': added_ports_data,
+        'removed_ports': removed_ports_data,
+        'unchanged_ports': unchanged_ports_data
+    }
 
 
 @app.route('/assets', methods=['GET', 'POST'])
@@ -869,6 +954,36 @@ def users_list():
     return render_template('manage_users.html', users=users, form=form)
 
 
+@app.route('/create-user', methods=['POST'])
+@login_required
+def create_user():
+    if not is_admin():
+        return jsonify({'success': False, 'error': '权限不足'}), 403
+    
+    form = UserForm()
+    if form.validate_on_submit():
+        # 检查用户名是否已存在
+        existing_user = User.query.filter_by(username=form.username.data).first()
+        if existing_user:
+            return jsonify({'success': False, 'error': '用户名已存在'}), 400
+        
+        # 创建新用户
+        user = User(
+            username=form.username.data,
+            password=generate_password_hash(form.password.data),
+            role=form.role.data
+        )
+        db.session.add(user)
+        db.session.commit()
+        return jsonify({'success': True})
+    
+    # 表单验证失败，返回错误信息
+    errors = {}
+    for field, field_errors in form.errors.items():
+        errors[field] = field_errors[0]  # 只取第一个错误信息
+    return jsonify({'success': False, 'error': '表单验证失败', 'errors': errors}), 400
+
+
 @app.route('/delete-user/<int:user_id>', methods=['POST'])
 @login_required
 def delete_user(user_id):
@@ -887,11 +1002,11 @@ def delete_user(user_id):
 @login_required
 def edit_user(user_id):
     if not is_admin():
-        return redirect(url_for('index'))
+        return jsonify({'success': False, 'error': '权限不足'}), 403
     
     user = User.query.get(user_id)
     if not user:
-        return redirect(url_for('users_list'))
+        return jsonify({'success': False, 'error': '用户不存在'}), 404
     
     form = UserForm(obj=user)
     if form.validate_on_submit():
@@ -900,9 +1015,17 @@ def edit_user(user_id):
             user.password = generate_password_hash(form.password.data)
         user.role = form.role.data
         db.session.commit()
-        return redirect(url_for('users_list'))
+        return jsonify({'success': True})
     
-    return render_template('edit_user.html', form=form, user=user)
+    # 如果是GET请求或者表单验证失败，返回表单页面
+    if request.method == 'GET':
+        return render_template('edit_user.html', form=form, user=user)
+    else:
+        # POST但验证失败，返回错误信息
+        errors = {}
+        for field, field_errors in form.errors.items():
+            errors[field] = field_errors[0]  # 只取第一个错误信息
+        return jsonify({'success': False, 'error': '表单验证失败', 'errors': errors}), 400
 
 
 @app.route('/get_user/<int:user_id>')
@@ -928,28 +1051,8 @@ def access_log():
     if not is_admin():
         return redirect(url_for('index'))
     
-    # 获取所有访问日志，按登录时间倒序排列
     logs = AccessLog.query.order_by(AccessLog.login_time.desc()).all()
     return render_template('access_log.html', logs=logs)
-
-
-# 错误页面引导
-@app.errorhandler(404)
-def page_not_found(e):
-    ip_address = request.remote_addr
-    request_url = request.path
-    log_entry = AccessLog(
-        username='Anonymous',  # 或者使用适当的标识符
-        ip_address=ip_address,
-        failed_login_attempts=0,  # 可以设置为0，因为404错误通常不是登录失败
-        request_url=request_url,
-        login_time=datetime.now()
-    )
-    db.session.add(log_entry)
-    db.session.commit()
-    
-    # 返回自定义的404错误页面或响应
-    return redirect(url_for('login'))
 
 
 if __name__ == '__main__':
@@ -970,7 +1073,7 @@ if __name__ == '__main__':
         
         # 初始化调度器
         scheduler = BackgroundScheduler()
-        scheduler.add_job(func=clean_expired_blocks, trigger="interval", minutes=1)
-        scheduler.start()
+        scheduler.add_job(clean_expired_blocks, 'interval', minutes=10)  # 每10分钟清理一次
+        scheduler.start()  # 确保调度器在应用启动时启动
         
-    app.run(debug=True, host='0.0.0.0')
+    app.run(host="0.0.0.0", debug=True)
