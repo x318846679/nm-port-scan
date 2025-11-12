@@ -1,42 +1,327 @@
 {% extends "layout.html" %}
+
 {% block content %}
-<h1>创建新任务</h1>
-<form method="post">
-    {{ form.hidden_tag() }}
-    <div class="mb-3">
-        {{ form.name.label }}
-        {{ form.name(class="form-control") }}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h2>全局数据分析</h2>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-12 mb-3">
+                            <h5>端口趋势</h5>
+                            <canvas id="portTrendChart" width="400" height="200"></canvas>
+                        </div>
+                        <div class="col-md-12">
+                            <h5>服务分布</h5>
+                            <canvas id="serviceDistributionChart" width="400" height="200"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-header">
+                    <h2>扫描概况</h2>
+                </div>
+                <div class="card-body">
+                    <div class="row" id="scanOverview">
+                        <!-- 扫描概况将通过AJAX加载 -->
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h3>全局搜索</h3>
+                </div>
+                <div class="card-body">
+                    <form id="searchForm">
+                        <div class="form-group">
+                            <label for="searchIP">搜索IP</label>
+                            <input type="text" class="form-control" id="searchIP" placeholder="输入IP地址">
+                        </div>
+                        <button type="submit" class="btn btn-primary">搜索</button>
+                    </form>
+                    <div id="searchResults" class="mt-3"></div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-header">
+                    <h3>创建扫描任务</h3>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        {{ form.hidden_tag() }}
+                        <div class="form-group">
+                            {{ form.name.label(class="form-label") }}
+                            {{ form.name(class="form-control") }}
+                            {% for error in form.name.errors %}
+                                <div class="text-danger">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>选择资产或手动输入IP</label>
+                            {{ form.asset(class="form-control mb-2") }}
+                            <small class="form-text text-muted">选择一个预定义资产或手动输入IP地址</small>
+                            {{ form.ips(class="form-control", rows=5, placeholder="手动输入IP地址(多个IP请换行分隔)") }}
+                            {% for error in form.ips.errors %}
+                                <div class="text-danger">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>选择参数模板或手动输入参数</label>
+                            {{ form.template(class="form-control mb-2") }}
+                            <small class="form-text text-muted">选择一个预定义参数模板或手动输入Nmap参数</small>
+                            {{ form.params(class="form-control") }}
+                            {% for error in form.params.errors %}
+                                <div class="text-danger">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        
+                        <div class="form-group form-check">
+                            {{ form.send_email(class="form-check-input") }}
+                            {{ form.send_email.label(class="form-check-label") }}
+                        </div>
+                        
+                        <div class="form-group">
+                            {{ form.email.label(class="form-label") }}
+                            {{ form.email(class="form-control") }}
+                            {% for error in form.email.errors %}
+                                <div class="text-danger">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        
+                        <div class="form-group">
+                            {{ form.threads.label(class="form-label") }}
+                            {{ form.threads(class="form-control") }}
+                            {% for error in form.threads.errors %}
+                                <div class="text-danger">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        
+                        <div class="form-group">
+                            {{ form.schedule.label(class="form-label") }}
+                            {{ form.schedule(class="form-control") }}
+                            <small class="form-text text-muted">设置任务执行间隔（分钟），0表示只执行一次</small>
+                            {% for error in form.schedule.errors %}
+                                <div class="text-danger">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        
+                        <div class="form-group">
+                            {{ form.submit(class="btn btn-primary") }}
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
     </div>
-    <div class="mb-3">
-        {{ form.ips.label }}
-        {{ form.ips(class="form-control") }}
-    </div>
-    <div class="mb-3">
-        {{ form.params.label }}
-        {{ form.params(class="form-control") }}
-    </div>
-    <div class="mb-3">
-        {{ form.send_email.label }}
-        {{ form.send_email(class="form-check-input") }}
-    </div>
-    <div class="mb-3">
-        {{ form.email.label }}
-        {{ form.email(class="form-control") }}
-    </div>
-    <div class="mb-3">
-        {{ form.threads.label }}
-        {{ form.threads(class="form-control") }}
-    </div>
-    <div class="mb-3">
-        {{ form.schedule.label }}
-        {{ form.schedule(class="form-control") }}
-    </div>
-    <div class="mb-3">
-        {{ form.created_at.label }}
-        {{ form.created_at(class="form-control") }}
-    </div>
-    <div class="mb-3">
-        {{ form.submit(class="btn btn-primary") }}
-    </div>
-</form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/chart.min.js') }}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 获取资产和模板选择框
+    const assetSelect = document.getElementById('asset');
+    const ipsTextarea = document.getElementById('ips');
+    const templateSelect = document.getElementById('template');
+    const paramsInput = document.getElementById('params');
+    
+    // 资产选择事件
+    assetSelect.addEventListener('change', function() {
+        if (this.value !== '-1') {
+            // 如果选择了资产，禁用IP输入框
+            ipsTextarea.disabled = true;
+            ipsTextarea.placeholder = '已选择资产，此处禁用';
+        } else {
+            // 如果未选择资产，启用IP输入框
+            ipsTextarea.disabled = false;
+            ipsTextarea.placeholder = '手动输入IP地址(多个IP请换行分隔)';
+        }
+    });
+    
+    // 模板选择事件
+    templateSelect.addEventListener('change', function() {
+        if (this.value !== '-1') {
+            // 如果选择了模板，禁用参数输入框
+            paramsInput.disabled = true;
+            paramsInput.placeholder = '已选择模板，此处禁用';
+        } else {
+            // 如果未选择模板，启用参数输入框
+            paramsInput.disabled = false;
+            paramsInput.placeholder = '手动输入Nmap参数';
+        }
+    });
+    
+    // 获取全局数据分析数据
+    fetch('?action=analytics')
+        .then(response => response.json())
+        .then(data => {
+            // 绘制端口趋势图
+            const portTrendCtx = document.getElementById('portTrendChart').getContext('2d');
+            const portTrendChart = new Chart(portTrendCtx, {
+                type: 'line',
+                data: {
+                    labels: Object.keys(data.port_trend),
+                    datasets: [{
+                        label: '端口数量',
+                        data: Object.values(data.port_trend),
+                        borderColor: 'rgb(75, 192, 192)',
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        },
+                        title: {
+                            display: true,
+                            text: '端口扫描趋势'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+            
+            // 绘制服务分布图
+            const serviceDistributionCtx = document.getElementById('serviceDistributionChart').getContext('2d');
+            const serviceDistributionChart = new Chart(serviceDistributionCtx, {
+                type: 'pie',
+                data: {
+                    labels: Object.keys(data.service_distribution),
+                    datasets: [{
+                        label: '服务分布',
+                        data: Object.values(data.service_distribution),
+                        backgroundColor: [
+                            'rgba(255, 99, 132, 0.2)',
+                            'rgba(54, 162, 235, 0.2)',
+                            'rgba(255, 206, 86, 0.2)',
+                            'rgba(75, 192, 192, 0.2)',
+                            'rgba(153, 102, 255, 0.2)',
+                            'rgba(255, 159, 64, 0.2)'
+                        ],
+                        borderColor: [
+                            'rgba(255, 99, 132, 1)',
+                            'rgba(54, 162, 235, 1)',
+                            'rgba(255, 206, 86, 1)',
+                            'rgba(75, 192, 192, 1)',
+                            'rgba(153, 102, 255, 1)',
+                            'rgba(255, 159, 64, 1)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        },
+                        title: {
+                            display: true,
+                            text: '服务类型分布'
+                        }
+                    }
+                }
+            });
+        });
+    
+    // 获取扫描概况数据
+    fetch('?action=overview')
+        .then(response => response.json())
+        .then(data => {
+            const overviewHtml = `
+                <div class="col-md-4">
+                    <div class="alert alert-info">
+                        <h5>总任务数</h5>
+                        <p>${data.total_tasks}</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="alert alert-success">
+                        <h5>完成任务</h5>
+                        <p>${data.completed_tasks}</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="alert alert-warning">
+                        <h5>扫描端口</h5>
+                        <p>${data.total_ports}</p>
+                    </div>
+                </div>
+            `;
+            document.getElementById('scanOverview').innerHTML = overviewHtml;
+        });
+    
+    // 全局搜索功能
+    document.getElementById('searchForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const ip = document.getElementById('searchIP').value;
+        if (ip) {
+            fetch(`?action=search&ip=${encodeURIComponent(ip)}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.ports && data.ports.length > 0) {
+                        let html = '<h5>端口趋势分析</h5>';
+                        html += '<canvas id="ipTrendChart" width="400" height="200"></canvas>';
+                        
+                        document.getElementById('searchResults').innerHTML = html;
+                        
+                        // 绘制IP端口趋势图
+                        const ipTrendCtx = document.getElementById('ipTrendChart').getContext('2d');
+                        const ipTrendChart = new Chart(ipTrendCtx, {
+                            type: 'line',
+                            data: {
+                                labels: data.dates,
+                                datasets: [{
+                                    label: '端口数量',
+                                    data: data.port_counts,
+                                    borderColor: 'rgb(255, 99, 132)',
+                                    backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                                    tension: 0.1
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                plugins: {
+                                    legend: {
+                                        position: 'top',
+                                    },
+                                    title: {
+                                        display: true,
+                                        text: `IP ${ip} 端口趋势`
+                                    }
+                                },
+                                scales: {
+                                    y: {
+                                        beginAtZero: true
+                                    }
+                                }
+                            }
+                        });
+                    } else {
+                        document.getElementById('searchResults').innerHTML = '<p class="text-muted">未找到相关数据</p>';
+                    }
+                });
+        }
+    });
+});
+</script>
 {% endblock %}

@@ -11,11 +11,18 @@
                 </div>
                 <div class="card-body">
                     <p><strong>参数:</strong> {{ task.params }}</p>
+                    {% if task.template %}
+                    <p><strong>参数模板:</strong> {{ task.template.name }}</p>
+                    {% endif %}
                     <p><strong>邮件发送:</strong> {{ '是' if task.send_email else '否'
                         }}</p>
                     <p><strong>创建时间:</strong> {{ task.created_at }}</p>
                     <p><strong>创建者:</strong> {{ task.creator.username
                         }}</p>
+                    
+                    {% if task.asset %}
+                    <p><strong>资产:</strong> {{ task.asset.name }}</p>
+                    {% endif %}
 
                     <p><strong>IP地址:</strong></p>
                     <textarea class="form-control" rows="5"
@@ -24,6 +31,118 @@
                 <div class="card-footer">
                     <button id="exportButton"
                         class="btn btn-primary">导出端口数据为Excel</button>
+                </div>
+            </div>
+            
+            {% if diff_data %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h3>与上次扫描对比</h3>
+                </div>
+                <div class="card-body">
+                    <p><strong>上次扫描任务:</strong> {{ diff_data.previous_task.name }} ({{ diff_data.previous_task.created_at }})</p>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <h4>新增端口 ({{ diff_data.added_ports|length }})</h4>
+                            {% if diff_data.added_ports %}
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>IP</th>
+                                        <th>协议</th>
+                                        <th>端口</th>
+                                        <th>服务</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for port in diff_data.added_ports %}
+                                    <tr>
+                                        <td>{{ port.ip }}</td>
+                                        <td>{{ port.agree }}</td>
+                                        <td>{{ port.port }}</td>
+                                        <td>{{ port.name }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                            {% else %}
+                            <p>无新增端口</p>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-4">
+                            <h4>减少端口 ({{ diff_data.removed_ports|length }})</h4>
+                            {% if diff_data.removed_ports %}
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>IP</th>
+                                        <th>协议</th>
+                                        <th>端口</th>
+                                        <th>服务</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for port in diff_data.removed_ports %}
+                                    <tr>
+                                        <td>{{ port.ip }}</td>
+                                        <td>{{ port.agree }}</td>
+                                        <td>{{ port.port }}</td>
+                                        <td>{{ port.name }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                            {% else %}
+                            <p>无减少端口</p>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-4">
+                            <h4>保持不变 ({{ diff_data.unchanged_ports|length }})</h4>
+                            {% if diff_data.unchanged_ports %}
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>IP</th>
+                                        <th>协议</th>
+                                        <th>端口</th>
+                                        <th>服务</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for port in diff_data.unchanged_ports %}
+                                    <tr>
+                                        <td>{{ port.ip }}</td>
+                                        <td>{{ port.agree }}</td>
+                                        <td>{{ port.port }}</td>
+                                        <td>{{ port.name }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                            {% else %}
+                            <p>无保持不变的端口</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h3>数据可视化</h3>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h4>服务类型分布</h4>
+                            <canvas id="serviceChart" width="400" height="400"></canvas>
+                        </div>
+                        <div class="col-md-6">
+                            <h4>端口变化趋势</h4>
+                            <canvas id="trendChart" width="400" height="400"></canvas>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -63,10 +182,112 @@
 
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/xlsx.full.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/chart.min.js') }}"></script>
 <script>
+// 准备端口数据
+var portsData = {{ ports_data|tojson }};
+var diffData = {{ diff_data|tojson if diff_data else "{}" }};
+var historyData = {{ history_data|tojson if history_data else "[]" }};
+
+// 统计服务类型
+var serviceCounts = {};
+portsData.forEach(function(port) {
+    serviceCounts[port.name] = (serviceCounts[port.name] || 0) + 1;
+});
+
 document.getElementById('exportButton').addEventListener('click', function() {
     var wb = XLSX.utils.table_to_book(document.getElementById('portTable'), { sheet: "Sheet1" });
     XLSX.writeFile(wb, 'port_table.xlsx');
+});
+
+// 创建服务类型图表
+var serviceCtx = document.getElementById('serviceChart').getContext('2d');
+var serviceChart = new Chart(serviceCtx, {
+    type: 'pie',
+    data: {
+        labels: Object.keys(serviceCounts),
+        datasets: [{
+            data: Object.values(serviceCounts),
+            backgroundColor: [
+                'rgba(255, 99, 132, 0.2)',
+                'rgba(54, 162, 235, 0.2)',
+                'rgba(255, 206, 86, 0.2)',
+                'rgba(75, 192, 192, 0.2)',
+                'rgba(153, 102, 255, 0.2)',
+                'rgba(255, 159, 64, 0.2)'
+            ],
+            borderColor: [
+                'rgba(255, 99, 132, 1)',
+                'rgba(54, 162, 235, 1)',
+                'rgba(255, 206, 86, 1)',
+                'rgba(75, 192, 192, 1)',
+                'rgba(153, 102, 255, 1)',
+                'rgba(255, 159, 64, 1)'
+            ],
+            borderWidth: 1
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            legend: {
+                position: 'top',
+            },
+            title: {
+                display: true,
+                text: '服务类型分布'
+            }
+        }
+    }
+});
+
+// 创建趋势图表
+var trendCtx = document.getElementById('trendChart').getContext('2d');
+
+// 准备趋势数据
+var trendLabels = [];
+var trendData = [];
+
+// 添加历史数据
+historyData.forEach(function(history) {
+    trendLabels.unshift(history.created_at);
+    trendData.unshift(history.port_count);
+});
+
+// 添加当前数据
+trendLabels.push("{{ task.created_at }}");
+trendData.push(portsData.length);
+
+var trendChart = new Chart(trendCtx, {
+    type: 'line',
+    data: {
+        labels: trendLabels,
+        datasets: [{
+            label: '端口数量',
+            data: trendData,
+            borderColor: 'rgb(75, 192, 192)',
+            backgroundColor: 'rgba(75, 192, 192, 0.2)',
+            tension: 0.1,
+            fill: false
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            legend: {
+                position: 'top',
+            },
+            title: {
+                display: true,
+                text: '端口变化趋势'
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true
+            }
+        }
+    }
 });
 </script>
 {% endblock %}

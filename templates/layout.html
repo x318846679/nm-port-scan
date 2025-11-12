@@ -47,6 +47,12 @@
                 <li class="nav-item">
                     <a class="nav-link" href="/tasks">任务列表</a>
                 </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/assets">资产管理</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/templates">参数模板</a>
+                </li>
                 {% if session.get('role') == 'admin' %}
                 <li class="nav-item">
                     <a class="nav-link" href="/users">用户管理</a>
@@ -58,6 +64,9 @@
                     <a class="nav-link" href="/access-log">访问日志</a>
                 </li>
                 {% endif %}
+                <li class="nav-item">
+                    <a class="nav-link" href="/change-password">修改密码</a>
+                </li>
                 <li class="nav-item">
                     <a class="nav-link" href="{{ url_for('logout') }}">
                         退出登录

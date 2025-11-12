@@ -1,0 +1,138 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container-fluid">
+    <h2>资产管理</h2>
+    
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 id="form-title">添加资产</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" id="asset-form">
+                        {{ form.hidden_tag() }}
+                        <input type="hidden" id="asset-id" name="asset_id" value="">
+                        <div class="form-group">
+                            {{ form.ip.label(class="form-label") }}
+                            {{ form.ip(class="form-control", rows=5, id="asset-ip") }}
+                            <small class="form-text text-muted">支持多个IP地址，每行一个或用空格分隔</small>
+                            {% for error in form.ip.errors %}
+                                <div class="text-danger">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        <div class="form-group">
+                            {{ form.name.label(class="form-label") }}
+                            {{ form.name(class="form-control", id="asset-name") }}
+                            {% for error in form.name.errors %}
+                                <div class="text-danger">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        <div class="form-group">
+                            {{ form.submit(class="btn btn-primary", id="asset-submit") }}
+                            <button type="button" class="btn btn-secondary" id="cancel-edit" style="display: none;">取消</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5>资产列表</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-bordered">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>IP地址</th>
+                                    <th>资产名称</th>
+                                    <th>创建者</th>
+                                    <th>创建时间</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for asset in assets %}
+                                <tr>
+                                    <td>{{ asset.id }}</td>
+                                    <td>
+                                        {% for line in asset.ip.split('\n') %}
+                                            {{ line }}<br>
+                                        {% endfor %}
+                                    </td>
+                                    <td>{{ asset.name }}</td>
+                                    <td>{{ asset.creator.username if asset.creator else 'N/A' }}</td>
+                                    <td>{{ asset.created_at.strftime('%Y-%m-%d %H:%M:%S') if asset.created_at else 'N/A' }}</td>
+                                    <td>
+                                        <button class="btn btn-info btn-sm edit-asset" 
+                                                data-id="{{ asset.id }}" 
+                                                data-ip="{{ asset.ip }}" 
+                                                data-name="{{ asset.name }}">编辑</button>
+                                        <form method="POST" action="{{ url_for('delete_asset', asset_id=asset.id) }}" style="display: inline;">
+                                            <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('确定要删除这个资产吗?')">删除</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const editButtons = document.querySelectorAll('.edit-asset');
+    const formTitle = document.getElementById('form-title');
+    const assetIdInput = document.getElementById('asset-id');
+    const assetIpInput = document.getElementById('asset-ip');
+    const assetNameInput = document.getElementById('asset-name');
+    const assetSubmitButton = document.getElementById('asset-submit');
+    const cancelEditButton = document.getElementById('cancel-edit');
+    const assetForm = document.getElementById('asset-form');
+    
+    editButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const id = this.getAttribute('data-id');
+            const ip = this.getAttribute('data-ip');
+            const name = this.getAttribute('data-name');
+            
+            // 填充表单
+            assetIdInput.value = id;
+            assetIpInput.value = ip;
+            assetNameInput.value = name;
+            
+            // 更新表单标题和按钮文本
+            formTitle.textContent = '编辑资产';
+            assetSubmitButton.textContent = '更新资产';
+            cancelEditButton.style.display = 'inline-block';
+            
+            // 滚动到表单顶部
+            document.querySelector('.card').scrollIntoView({ behavior: 'smooth' });
+        });
+    });
+    
+    cancelEditButton.addEventListener('click', function() {
+        // 重置表单
+        assetIdInput.value = '';
+        assetIpInput.value = '';
+        assetNameInput.value = '';
+        formTitle.textContent = '添加资产';
+        assetSubmitButton.textContent = '添加资产';
+        cancelEditButton.style.display = 'none';
+    });
+});
+</script>
+{% endblock %}

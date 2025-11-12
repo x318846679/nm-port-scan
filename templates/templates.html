@@ -1,0 +1,147 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container-fluid">
+    <h2>参数模板管理</h2>
+    
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 id="form-title">添加参数模板</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" id="template-form">
+                        {{ form.hidden_tag() }}
+                        <input type="hidden" id="template-id" name="template_id" value="">
+                        <div class="form-group">
+                            {{ form.name.label(class="form-label") }}
+                            {{ form.name(class="form-control", id="template-name") }}
+                            {% for error in form.name.errors %}
+                                <div class="text-danger">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        <div class="form-group">
+                            {{ form.params.label(class="form-label") }}
+                            {{ form.params(class="form-control", id="template-params") }}
+                            {% for error in form.params.errors %}
+                                <div class="text-danger">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        <div class="form-group">
+                            {{ form.description.label(class="form-label") }}
+                            {{ form.description(class="form-control", rows=3, id="template-description") }}
+                            {% for error in form.description.errors %}
+                                <div class="text-danger">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        <div class="form-group">
+                            {{ form.submit(class="btn btn-primary", id="template-submit") }}
+                            <button type="button" class="btn btn-secondary" id="cancel-edit" style="display: none;">取消</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5>参数模板列表</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-bordered">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>模板名称</th>
+                                    <th>Nmap参数</th>
+                                    <th>描述</th>
+                                    <th>创建者</th>
+                                    <th>创建时间</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for template in templates %}
+                                <tr>
+                                    <td>{{ template.id }}</td>
+                                    <td>{{ template.name }}</td>
+                                    <td>{{ template.params }}</td>
+                                    <td>{{ template.description or '' }}</td>
+                                    <td>{{ template.creator.username if template.creator else 'N/A' }}</td>
+                                    <td>{{ template.created_at.strftime('%Y-%m-%d %H:%M:%S') if template.created_at else 'N/A' }}</td>
+                                    <td>
+                                        <button class="btn btn-info btn-sm edit-template" 
+                                                data-id="{{ template.id }}" 
+                                                data-name="{{ template.name }}"
+                                                data-params="{{ template.params }}"
+                                                data-description="{{ template.description or '' }}">编辑</button>
+                                        <form method="POST" action="{{ url_for('delete_template', template_id=template.id) }}" style="display: inline;">
+                                            <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('确定要删除这个模板吗?')">删除</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const editButtons = document.querySelectorAll('.edit-template');
+    const formTitle = document.getElementById('form-title');
+    const templateIdInput = document.getElementById('template-id');
+    const templateNameInput = document.getElementById('template-name');
+    const templateParamsInput = document.getElementById('template-params');
+    const templateDescriptionInput = document.getElementById('template-description');
+    const templateSubmitButton = document.getElementById('template-submit');
+    const cancelEditButton = document.getElementById('cancel-edit');
+    const templateForm = document.getElementById('template-form');
+    
+    editButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const id = this.getAttribute('data-id');
+            const name = this.getAttribute('data-name');
+            const params = this.getAttribute('data-params');
+            const description = this.getAttribute('data-description');
+            
+            // 填充表单
+            templateIdInput.value = id;
+            templateNameInput.value = name;
+            templateParamsInput.value = params;
+            templateDescriptionInput.value = description;
+            
+            // 更新表单标题和按钮文本
+            formTitle.textContent = '编辑参数模板';
+            templateSubmitButton.textContent = '更新模板';
+            cancelEditButton.style.display = 'inline-block';
+            
+            // 滚动到表单顶部
+            document.querySelector('.card').scrollIntoView({ behavior: 'smooth' });
+        });
+    });
+    
+    cancelEditButton.addEventListener('click', function() {
+        // 重置表单
+        templateIdInput.value = '';
+        templateNameInput.value = '';
+        templateParamsInput.value = '';
+        templateDescriptionInput.value = '';
+        formTitle.textContent = '添加参数模板';
+        templateSubmitButton.textContent = '保存模板';
+        cancelEditButton.style.display = 'none';
+    });
+});
+</script>
+{% endblock %}

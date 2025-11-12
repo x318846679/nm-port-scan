@@ -25,12 +25,81 @@
             {{ form.submit(class="btn btn-primary") }}
         </div>
     </form>
+    
+    <div class="card mt-4">
+        <div class="card-header">
+            <h3>邮箱配置信息</h3>
+        </div>
+        <div class="card-body">
+            <p><strong>SMTP服务器地址:</strong> {{ email_setting.host }}</p>
+            <p><strong>SMPT服务器端口:</strong> {{ email_setting.port }}</p>
+            <p><strong>EMail账户:</strong> {{ email_setting.user }}</p>
+            <p><strong>Email密码:</strong> {{ email_setting.passwd }}</p>
+        </div>
+    </div>
+    
+    <div class="card mt-4">
+        <div class="card-header">
+            <h3>测试邮箱连接</h3>
+        </div>
+        <div class="card-body">
+            <form id="testEmailForm">
+                <div class="mb-3">
+                    <label for="testEmail" class="form-label">测试邮箱地址</label>
+                    <input type="email" class="form-control" id="testEmail" placeholder="输入测试邮箱地址">
+                </div>
+                <button type="submit" class="btn btn-success" id="testEmailButton">发送测试邮件</button>
+            </form>
+            <div id="testResult" class="mt-3"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
 
-</div>
-<div class="card-body">
-    <p><strong>SMTP服务器地址:</strong> {{ email_setting.host }}</p>
-    <p><strong>SMPT服务器端口:</strong> {{ email_setting.port }}</p>
-    <p><strong>EMail账户:</strong> {{ email_setting.user }}</p>
-    <p><strong>Email密码:</strong> {{ email_setting.passwd }}</p>
-</div>
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('testEmailForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const testEmail = document.getElementById('testEmail').value;
+        const testButton = document.getElementById('testEmailButton');
+        const testResult = document.getElementById('testResult');
+        
+        if (!testEmail) {
+            testResult.innerHTML = '<div class="alert alert-warning">请输入测试邮箱地址</div>';
+            return;
+        }
+        
+        // 禁用按钮并显示加载状态
+        testButton.disabled = true;
+        testButton.textContent = '发送中...';
+        testResult.innerHTML = '<div class="alert alert-info">正在发送测试邮件...</div>';
+        
+        // 发送测试邮件请求
+        fetch('/test_email', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({email: testEmail})
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                testResult.innerHTML = '<div class="alert alert-success">测试邮件发送成功！</div>';
+            } else {
+                testResult.innerHTML = `<div class="alert alert-danger">测试邮件发送失败: ${data.error}</div>`;
+            }
+        })
+        .catch(error => {
+            testResult.innerHTML = `<div class="alert alert-danger">发送测试邮件时发生错误: ${error}</div>`;
+        })
+        .finally(() => {
+            // 恢复按钮状态
+            testButton.disabled = false;
+            testButton.textContent = '发送测试邮件';
+        });
+    });
+});
+</script>
 {% endblock %}
