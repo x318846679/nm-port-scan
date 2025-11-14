@@ -21,6 +21,10 @@
             {{ form.role.label(class="form-label") }}
             {{ form.role(class="form-select") }}
         </div>
+        <div class="mb-3">
+            {{ form.email.label(class="form-label") }}
+            {{ form.email(class="form-control", size=32) }}
+        </div>
         <div>
             {{ form.submit(class="btn btn-primary", id="create-user-btn") }}
         </div>
@@ -44,7 +48,7 @@
                     <!-- 编辑和删除按钮 -->
                     <button class="btn btn-warning btn-sm edit-user-btn" 
                         data-user-id="{{ user.id }}">编辑</button>
-                    <a href="{{ url_for('delete_user', user_id=user.id) }}"
+                    <a href="{{ url_for('delete_user', id=user.id) }}"
                         class="btn btn-danger btn-sm"
                         onclick="return confirm('确定要删除这个用户吗？')">删除</a>
                 </td>
@@ -86,6 +90,10 @@
                         {{ form.role.label(class="form-label") }}
                         {{ form.role(class="form-select", id="edit-role") }}
                     </div>
+                    <div class="mb-3">
+                        {{ form.email.label(class="form-label") }}
+                        {{ form.email(class="form-control", size=32, id="edit-email") }}
+                    </div>
                     <div>
                         <button type="submit"
                             class="btn btn-primary">保存更改</button>
@@ -111,15 +119,25 @@
             data: formData,
             success: function(response) {
                 if (response.success) {
+                    alert('用户创建成功');
                     location.reload();
                 } else {
-                    alert('创建失败: ' + (response.error || '未知错误'));
+                    var errorMsg = '创建失败: ' + (response.error || '未知错误');
+                    if (response.errors) {
+                        errorMsg += '\n具体错误:\n';
+                        for (var field in response.errors) {
+                            errorMsg += field + ': ' + response.errors[field] + '\n';
+                        }
+                    }
+                    alert(errorMsg);
                 }
             },
             error: function(xhr) {
                 var errorMsg = '创建失败';
                 if (xhr.responseJSON && xhr.responseJSON.error) {
                     errorMsg += ': ' + xhr.responseJSON.error;
+                } else if (xhr.statusText) {
+                    errorMsg += ': ' + xhr.statusText;
                 }
                 alert(errorMsg);
             }
@@ -139,6 +157,7 @@
                 $('#edit-user-id').val(userId);
                 $('#edit-username').val(data.username);
                 $('#edit-role').val(data.role);
+                $('#edit-email').val(data.email || '');
                 
                 // 清空密码字段
                 $('#edit-password').val('');
@@ -148,9 +167,18 @@
                 $('#editUserModal').modal('show');
             },
             error: function(xhr) {
-                alert('获取用户信息失败: ' + xhr.responseJSON.error);
+                alert('获取用户信息失败: ' + (xhr.responseJSON ? xhr.responseJSON.error : '未知错误'));
             }
         });
+    });
+    
+    // 监听模态框关闭事件
+    $('#editUserModal').on('hidden.bs.modal', function (e) {
+        // 清空表单数据
+        $('#editUserForm')[0].reset();
+        // 清空可能存在的服务器端验证错误信息
+        $('.invalid-feedback').remove();
+        $('.is-invalid').removeClass('is-invalid');
     });
 
     // 编辑用户表单提交事件
@@ -167,12 +195,18 @@
             success: function(response) {
                 if (response.success !== undefined) {
                     if (response.success) {
+                        // 关闭模态框
+                        $('#editUserModal').modal('hide');
+                        // 显示成功消息
+                        alert('用户更新成功');
+                        // 重新加载页面
                         location.reload();
                     } else {
                         alert('更新失败: ' + (response.error || '未知错误'));
                     }
                 } else {
                     // 如果返回的是页面而不是JSON，说明成功了
+                    $('#editUserModal').modal('hide');
                     location.reload();
                 }
             },

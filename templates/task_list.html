@@ -1,175 +1,244 @@
 {% extends "layout.html" %}
+
 {% block content %}
-<h1>任务列表</h1>
-<table class="table">
-    <thead>
-        <tr>
-            <th>ID</th>
-            <th>任务名称</th>
-            <th>IP地址</th>
-            <th>参数</th>
-            <th>邮件发送</th>
-            <th>创建时间</th>
-            <th>创建者</th> <!-- 新增列 -->
-            <th>状态</th>
-            <th>进度</th>
-            <th>定时执行</th>
-            <th>下一次执行</th>
-            <th>操作</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for task in tasks %}
-        <tr id="task-row-{{ task.id }}">
-            <td>{{ task.id }}</td>
-            <td>{{ task.name }}</td>
-            <td>
-                {% set ip_list = task.ips.split() %}
-                {% if ip_list|length > 1 %}
-                <span data-toggle="tooltip" title="{{ ip_list|join('\n') }}">
-                    {{ ip_list[0] }}等{{ ip_list|length }}个IP
-                </span>
-                {% else %}
-                {{ task.ips }}
-                {% endif %}
-            </td>
-            <td>{{ task.params }}</td>
-            <td>{{ '是' if task.send_email else '否' }}</td>
-            <td>{{ task.created_at }}</td>
-            <td>{{ task.creator.username }}</td> <!-- 显示创建者 -->
-            <td>
-                {% if task.status == 'running' %}
-                <span class="badge bg-success">运行</span>
-                {% elif task.status == 'terminated' %}
-                <span class="badge bg-danger">终止</span>
-                {% else %}
-                <span class="badge bg-secondary">未知</span>
-                {% endif %}
-            </td>
-            <td>
-                <div class="progress">
-                    <div id="progress-{{ task.id }}" class="progress-bar"
-                        role="progressbar" style="width: 0%;" aria-valuenow="0"
-                        aria-valuemin="0" aria-valuemax="100">
-                        0%
-                    </div>
-                </div>
-            </td>
-            <td>{{ task.schedule_interval }}分钟</td>
-            <td>{{ task.next_execution if task.next_execution else '无定时' }}</td>
+<div class="header">
+    <h1><i class="fas fa-tasks"></i> 扫描任务列表</h1>
+    <p>管理您的所有扫描任务，可以查看、执行、编辑或删除任务。</p>
+</div>
 
-            <td>
-                <a href="{{ url_for('task_detail', task_id=task.id) }}"
-                    class="btn btn-info btn-sm">查看详情</a>
-                <button onclick="terminateTask({{ task.id }})"
-                    class="btn btn-danger btn-sm">终止</button>
-                <button onclick="executeTask({{ task.id }})"
-                    class="btn btn-primary btn-sm">执行</button>
-                <button onclick="confirmDeleteTask({{ task.id }})"
-                    class="btn btn-warning btn-sm">删除</button>
-            </td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h3>所有任务</h3>
+        <a href="{{ url_for('index') }}?action=create" class="btn btn-primary">
+            <i class="fas fa-plus"></i> 创建新任务
+        </a>
+    </div>
+    <div class="card-body">
+        {% if tasks %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>任务ID</th>
+                        <th>任务名称</th>
+                        <th>目标</th>
+                        <th>状态</th>
+                        <th>进度</th>
+                        <th>创建时间</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for task in tasks %}
+                    <tr id="task-row-{{ task.id }}">
+                        <td>{{ task.id }}</td>
+                        <td>{{ task.name }}</td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-secondary" 
+                                    onclick="showIPs({{ task.id }})" 
+                                    data-ips="{{ task.ips.replace('\n', ', ') }}">
+                                查看IP
+                            </button>
+                        </td>
+                        <td>
+                            {% if task.status == 'running' %}
+                                <span class="badge bg-warning">运行中</span>
+                            {% elif task.status == 'completed' %}
+                                <span class="badge bg-success">已完成</span>
+                            {% elif task.status == 'failed' %}
+                                <span class="badge bg-danger">失败</span>
+                            {% else %}
+                                <span class="badge bg-secondary">{{ task.status }}</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if task.status == 'running' %}
+                                <div class="progress" style="height: 20px;">
+                                    <div class="progress-bar" 
+                                         role="progressbar" 
+                                         style="width: {{ task.progress | int }}%" 
+                                         aria-valuenow="{{ task.progress | int }}" 
+                                         aria-valuemin="0" 
+                                         aria-valuemax="100">
+                                        {{ task.progress | int }}%
+                                    </div>
+                                </div>
+                            {% elif task.status == 'completed' %}
+                                <div class="progress" style="height: 20px;">
+                                    <div class="progress-bar bg-success" 
+                                         role="progressbar" 
+                                         style="width: 100%" 
+                                         aria-valuenow="100" 
+                                         aria-valuemin="0" 
+                                         aria-valuemax="100">
+                                        100%
+                                    </div>
+                                </div>
+                            {% else %}
+                                <span class="text-muted">N/A</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ task.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                        <td>
+                            <div class="btn-group" role="group">
+                                {% if task.status != 'running' %}
+                                <button class="btn btn-sm btn-success execute-task" data-task-id="{{ task.id }}">
+                                    <i class="fas fa-play"></i> 执行
+                                </button>
+                                {% else %}
+                                <button class="btn btn-sm btn-danger terminate-task" data-task-id="{{ task.id }}">
+                                    <i class="fas fa-stop"></i> 终止
+                                </button>
+                                {% endif %}
+                                
+                                <a href="{{ url_for('task_detail', task_id=task.id) }}" 
+                                   class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-eye"></i> 查看
+                                </a>
+                                
+                                <a href="{{ url_for('delete_task_old', id=task.id) }}" 
+                                   class="btn btn-sm btn-outline-danger"
+                                   onclick="return confirm('确定要删除这个任务吗？')">
+                                    <i class="fas fa-trash"></i> 删除
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="fas fa-tasks fa-3x text-muted mb-3"></i>
+            <h4 class="text-muted">暂无任务</h4>
+            <p class="text-muted">点击下面按钮创建您的第一个扫描任务</p>
+            <a href="{{ url_for('index') }}?action=create" class="btn btn-primary">
+                <i class="fas fa-plus-circle"></i> 创建任务
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
 
+<!-- IP详情模态框 -->
+<div class="modal fade" id="ipModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">任务目标IP</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="ipList" class="bg-light p-3 rounded"></div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
 <script>
-function terminateTask(taskId) {
-    fetch(`/terminate_task/${taskId}`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        }
-    }).then(response => response.json())
-      .then(data => {
-          if (data.success) {
-              alert('任务已终止');
-              location.reload();
-          } else {
-              alert('终止任务失败');
-          }
-      }).catch(error => {
-          console.error('Error:', error);
-      });
+function showIPs(taskId) {
+    var button = event.target;
+    var ips = button.getAttribute('data-ips');
+    document.getElementById('ipList').innerText = ips;
+    var modal = new bootstrap.Modal(document.getElementById('ipModal'));
+    modal.show();
 }
 
-function executeTask(taskId) {
-    fetch(`/execute_task/${taskId}`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        }
-    }).then(response => response.json())
-      .then(data => {
-          if (data.success) {
-              alert('任务已重新执行');
-              location.reload();
-          } else {
-              alert('执行任务失败');
-          }
-      }).catch(error => {
-          console.error('Error:', error);
-      });
-}
+// 定义一个映射来存储每个任务的轮询定时器
+var progressTimers = {};
 
-function confirmDeleteTask(taskId) {
-    if (confirm('确定要删除这个任务吗？')) {
-        deleteTask(taskId);
-    }
-}
-
-function deleteTask(taskId) {
-    fetch(`/delete_task/${taskId}`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        }
-    }).then(response => response.json())
-      .then(data => {
-          if (data.success) {
-              alert('任务已删除');
-              var taskRow = document.getElementById(`task-row-${taskId}`);
-              if (taskRow) {
-                  taskRow.remove();
-              } else {
-                  console.error('任务行不存在，无法删除');
-              }
-          } else {
-              alert('删除任务失败');
-          }
-      }).catch(error => {
-          console.error('Error:', error);
-      });
-}
-
-function updateProgress(taskId) {
-    fetch(`/progress/${taskId}`)
-    .then(response => response.json())
-    .then(data => {
-        const progressBar = document.getElementById(`progress-${taskId}`);
-        if (progressBar) {
-            let progress = data.progress;
-            if (progress >= 100) {
-                progress = 100; // Ensure progress is capped at 100%
+// 更新任务进度的函数
+function updateTaskProgress(taskId) {
+    $.get('/get_progress/' + taskId, function(data) {
+        if (data.progress !== undefined) {
+            var progressBar = $('#task-row-' + taskId + ' .progress-bar');
+            progressBar.css('width', data.progress + '%');
+            progressBar.attr('aria-valuenow', data.progress);
+            progressBar.text(data.progress + '%');
+            
+            // 如果进度达到100%，停止轮询
+            if (data.progress >= 100) {
+                clearInterval(progressTimers[taskId]);
+                delete progressTimers[taskId];
+                // 刷新页面以更新状态显示
+                setTimeout(function() {
+                    location.reload();
+                }, 1000);
             }
-            progressBar.style.width = `${progress}%`;
-            progressBar.setAttribute('aria-valuenow', progress);
-            progressBar.textContent = `${progress.toFixed(2)}%`;
         }
-    })
-    .catch(error => {
-        console.error('Error fetching progress:', error);
+    }).fail(function() {
+        // 如果请求失败，也停止轮询
+        clearInterval(progressTimers[taskId]);
+        delete progressTimers[taskId];
     });
 }
 
-{% for task in tasks %}
-setInterval(() => {
-    updateProgress({{ task.id }});
-}, 1000);
-{% endfor %}
+$(document).ready(function() {
+    $('.execute-task').on('click', function() {
+        var taskId = $(this).data('task-id');
+        $.post('/execute_task/' + taskId, function(data) {
+            if (data.success) {
+                alert('任务已启动');
+                // 更新任务状态为运行中
+                var row = $('#task-row-' + taskId);
+                row.find('td:eq(3) span').removeClass('bg-secondary').addClass('bg-warning').text('运行中');
+                
+                // 添加进度条
+                var progressCell = row.find('td:eq(4)');
+                progressCell.html(`
+                    <div class="progress" style="height: 20px;">
+                        <div class="progress-bar" role="progressbar" style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
+                    </div>
+                `);
+                
+                // 开始轮询更新进度
+                progressTimers[taskId] = setInterval(function() {
+                    updateTaskProgress(taskId);
+                }, 1000);
+                
+                // 3秒后刷新页面以确保状态同步
+                setTimeout(function() {
+                    location.reload();
+                }, 3000);
+            } else {
+                alert('启动任务失败: ' + data.error);
+            }
+        }).fail(function() {
+            alert('无法连接到服务器');
+        });
+    });
 
-$(document).ready(function(){
-    $('[data-toggle="tooltip"]').tooltip({html: true});
+    $('.terminate-task').on('click', function() {
+        var taskId = $(this).data('task-id');
+        $.post('/terminate_task/' + taskId, function(data) {
+            if (data.success) {
+                alert('任务已终止');
+                location.reload();
+            } else {
+                alert('终止任务失败: ' + data.error);
+            }
+        }).fail(function() {
+            alert('无法连接到服务器');
+        });
+    });
+    
+    // 为已经在运行中的任务启动进度轮询
+    $('tr').each(function() {
+        var row = $(this);
+        var statusCell = row.find('td:eq(3) span');
+        if (statusCell.hasClass('bg-warning')) {
+            // 这是一个运行中的任务
+            var taskId = row.attr('id').split('-')[2];
+            if (taskId) {
+                progressTimers[taskId] = setInterval(function() {
+                    updateTaskProgress(taskId);
+                }, 1000);
+            }
+        }
+    });
 });
 </script>
 {% endblock %}

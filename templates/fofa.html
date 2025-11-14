@@ -1,0 +1,269 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="header">
+    <h1><i class="anticon anticon-search"></i> FOFA资产搜索</h1>
+    <p>通过FOFA语法搜索网络资产</p>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h3>搜索条件</h3>
+    </div>
+    <div class="card-body">
+        <form id="fofa-search-form">
+            <div class="mb-3">
+                <label for="query" class="form-label">FOFA查询语句</label>
+                <input type="text" class="form-control" id="query" placeholder="例如: app=&quot;Apache httpd&quot; && country=&quot;CN&quot;">
+                <div class="form-text">输入FOFA查询语法，例如: app="Apache httpd" && country="CN"</div>
+            </div>
+            <div class="mb-3">
+                <label for="size" class="form-label">返回结果数量</label>
+                <input type="number" class="form-control" id="size" value="100" min="1" max="10000">
+                <div class="form-text">最多返回10000条结果</div>
+            </div>
+            <button type="submit" class="btn btn-primary">
+                <i class="anticon anticon-search"></i> 搜索
+            </button>
+        </form>
+    </div>
+</div>
+
+<div class="card mt-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h3>搜索结果</h3>
+        <button id="export-btn" class="btn btn-success" disabled>
+            <i class="anticon anticon-file-export"></i> 导出结果
+        </button>
+    </div>
+    <div class="card-body">
+        <div id="loading" class="text-center" style="display: none;">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">加载中...</span>
+            </div>
+        </div>
+        <div id="results-container" style="display: none;">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover" id="results-table">
+                    <thead>
+                        <tr>
+                            <th>IP</th>
+                            <th>端口</th>
+                            <th>协议</th>
+                            <th>域名</th>
+                            <th>标题</th>
+                            <th>服务</th>
+                            <th>操作系统</th>
+                            <th>国家</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="results-body">
+                    </tbody>
+                </table>
+            </div>
+            <div class="d-flex justify-content-between align-items-center mt-3">
+                <div>
+                    <span>每页显示: </span>
+                    <select id="page-size" class="form-select d-inline w-auto">
+                        <option value="10">10</option>
+                        <option value="25" selected>25</option>
+                        <option value="50">50</option>
+                        <option value="100">100</option>
+                    </select>
+                </div>
+                <div>
+                    <button id="prev-page" class="btn btn-secondary" disabled>
+                        <i class="anticon anticon-left"></i> 上一页
+                    </button>
+                    <span id="page-info">第 1 页</span>
+                    <button id="next-page" class="btn btn-secondary" disabled>
+                        下一页 <i class="anticon anticon-right"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div id="no-results" class="text-center" style="display: none;">
+            <p class="text-muted">暂无搜索结果</p>
+        </div>
+    </div>
+</div>
+
+<div class="card mt-4">
+    <div class="card-header">
+        <h3>FOFA查询语法参考</h3>
+    </div>
+    <div class="card-body">
+        <h5>常用字段</h5>
+        <ul>
+            <li><code>ip</code> - IP地址</li>
+            <li><code>port</code> - 端口</li>
+            <li><code>protocol</code> - 协议</li>
+            <li><code>domain</code> - 域名</li>
+            <li><code>title</code> - 网页标题</li>
+            <li><code>server</code> - 服务</li>
+            <li><code>os</code> - 操作系统</li>
+            <li><code>country</code> - 国家</li>
+            <li><code>app</code> - 应用名称</li>
+        </ul>
+        
+        <h5>逻辑操作符</h5>
+        <ul>
+            <li><code>&&</code> - 与</li>
+            <li><code>||</code> - 或</li>
+            <li><code>!</code> - 非</li>
+        </ul>
+        
+        <h5>示例</h5>
+        <ul>
+            <li><code>app="Apache httpd" && country="CN"</code> - 查找中国的Apache服务器</li>
+            <li><code>port="80" && title="login"</code> - 查找端口80且标题包含login的网站</li>
+            <li><code>ip="192.168.0.0/16"</code> - 查找指定网段的资产</li>
+        </ul>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentResults = [];
+let currentPage = 1;
+let pageSize = 25;
+
+document.getElementById('fofa-search-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    searchFofa();
+});
+
+document.getElementById('page-size').addEventListener('change', function() {
+    pageSize = parseInt(this.value);
+    currentPage = 1;
+    renderResults();
+});
+
+document.getElementById('prev-page').addEventListener('click', function() {
+    if (currentPage > 1) {
+        currentPage--;
+        renderResults();
+    }
+});
+
+document.getElementById('next-page').addEventListener('click', function() {
+    const totalPages = Math.ceil(currentResults.length / pageSize);
+    if (currentPage < totalPages) {
+        currentPage++;
+        renderResults();
+    }
+});
+
+document.getElementById('export-btn').addEventListener('click', function() {
+    exportResults();
+});
+
+function searchFofa() {
+    const query = document.getElementById('query').value.trim();
+    const size = parseInt(document.getElementById('size').value);
+    
+    if (!query) {
+        alert('请输入查询语句');
+        return;
+    }
+    
+    // 显示加载状态
+    document.getElementById('loading').style.display = 'block';
+    document.getElementById('results-container').style.display = 'none';
+    document.getElementById('no-results').style.display = 'none';
+    document.getElementById('export-btn').disabled = true;
+    
+    // 准备请求数据
+    const requestData = {
+        query: query,
+        size: size
+    };
+    
+    // 发送请求到后端API
+    fetch('/api/fofa/search', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        // 隐藏加载状态
+        document.getElementById('loading').style.display = 'none';
+        
+        if (data.success) {
+            currentResults = data.results || [];
+            if (currentResults.length > 0) {
+                document.getElementById('results-container').style.display = 'block';
+                document.getElementById('export-btn').disabled = false;
+                currentPage = 1;
+                renderResults();
+            } else {
+                document.getElementById('no-results').style.display = 'block';
+            }
+        } else {
+            alert('搜索失败: ' + (data.error || '未知错误'));
+            document.getElementById('no-results').style.display = 'block';
+        }
+    })
+    .catch(error => {
+        // 隐藏加载状态
+        document.getElementById('loading').style.display = 'none';
+        alert('请求失败: ' + error.message);
+        document.getElementById('no-results').style.display = 'block';
+    });
+}
+
+function renderResults() {
+    const tbody = document.getElementById('results-body');
+    tbody.innerHTML = '';
+    
+    const start = (currentPage - 1) * pageSize;
+    const end = start + pageSize;
+    const pageData = currentResults.slice(start, end);
+    
+    pageData.forEach(result => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${result.ip}</td>
+            <td>${result.port}</td>
+            <td>${result.protocol || 'N/A'}</td>
+            <td>${result.domain || 'N/A'}</td>
+            <td>${result.title || 'N/A'}</td>
+            <td>${result.server || 'N/A'}</td>
+            <td>${result.os || 'N/A'}</td>
+            <td>${result.country || 'N/A'}</td>
+            <td>
+                <button class="btn btn-sm btn-primary" onclick="createTask('${result.ip}:${result.port}')">
+                    <i class="anticon anticon-plus"></i> 创建任务
+                </button>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+    
+    // 更新分页信息
+    const totalPages = Math.ceil(currentResults.length / pageSize);
+    document.getElementById('page-info').textContent = `第 ${currentPage} 页，共 ${totalPages} 页`;
+    
+    // 更新按钮状态
+    document.getElementById('prev-page').disabled = currentPage === 1;
+    document.getElementById('next-page').disabled = currentPage === totalPages;
+}
+
+function createTask(target) {
+    if (confirm(`确定要为 ${target} 创建扫描任务吗？`)) {
+        // 实际应该调用后端API创建任务
+        alert(`已为 ${target} 创建扫描任务`);
+    }
+}
+
+function exportResults() {
+    // 实际应该导出搜索结果
+    alert('导出功能占位符');
+}
+</script>
+{% endblock %}

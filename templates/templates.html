@@ -13,7 +13,7 @@
                 <div class="card-body">
                     <form method="POST" id="template-form">
                         {{ form.hidden_tag() }}
-                        <input type="hidden" id="template-id" name="template_id" value="">
+                        <input type="hidden" id="template-id" name="id" value="">
                         <div class="form-group">
                             {{ form.name.label(class="form-label") }}
                             {{ form.name(class="form-control", id="template-name") }}
@@ -80,7 +80,7 @@
                                                 data-name="{{ template.name }}"
                                                 data-params="{{ template.params }}"
                                                 data-description="{{ template.description or '' }}">编辑</button>
-                                        <form method="POST" action="{{ url_for('delete_template', template_id=template.id) }}" style="display: inline;">
+                                        <form method="POST" action="{{ url_for('delete_template', id=template.id) }}" style="display: inline;">
                                             <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('确定要删除这个模板吗?')">删除</button>
                                         </form>
                                     </td>
@@ -141,6 +141,17 @@ document.addEventListener('DOMContentLoaded', function() {
         formTitle.textContent = '添加参数模板';
         templateSubmitButton.textContent = '保存模板';
         cancelEditButton.style.display = 'none';
+    });
+    
+    // 处理表单提交
+    templateForm.addEventListener('submit', function(e) {
+        // 如果是编辑模式（有模板ID），修改表单动作
+        const templateId = templateIdInput.value;
+        if (templateId) {
+            // 设置表单动作到更新路由
+            templateForm.action = '/templates?id=' + templateId;
+            templateForm.method = 'POST';
+        }
     });
 });
 </script>
