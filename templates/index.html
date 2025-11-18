@@ -1,126 +1,290 @@
 {% extends "layout.html" %}
 
 {% block content %}
-<div class="container-fluid">
-    <div class="row">
-        <div class="col-md-8">
-            <div class="card mb-4">
-                <div class="card-header">
-                    <h2>全局数据分析</h2>
-                </div>
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-12 mb-3">
-                            <h5>端口趋势</h5>
-                            <canvas id="portTrendChart" width="400" height="200"></canvas>
-                        </div>
-                        <div class="col-md-12">
-                            <h5>服务分布</h5>
-                            <canvas id="serviceDistributionChart" width="400" height="200"></canvas>
-                        </div>
+<div class="header">
+    <h1><i class="fas fa-home"></i> 系统概览</h1>
+    <p>欢迎使用端口扫描管理系统，您可以在这里创建新任务、查看统计信息和管理系统资源。</p>
+</div>
+
+<!-- Flash 消息 -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <div class="flash-messages">
+      {% for category, message in messages %}
+        <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+          {{ message }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}
+
+<!-- 统计卡片 -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-white bg-primary">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h5>总任务数</h5>
+                        <h2>{{ stats.total_tasks }}</h2>
                     </div>
-                </div>
-            </div>
-            
-            <div class="card">
-                <div class="card-header">
-                    <h2>扫描概况</h2>
-                </div>
-                <div class="card-body">
-                    <div class="row" id="scanOverview">
-                        <!-- 扫描概况将通过AJAX加载 -->
+                    <div class="icon">
+                        <i class="fas fa-tasks fa-2x"></i>
                     </div>
                 </div>
             </div>
         </div>
-        
-        <div class="col-md-4">
-            <div class="card mb-4">
-                <div class="card-header">
-                    <h3>全局搜索</h3>
-                </div>
-                <div class="card-body">
-                    <form id="searchForm">
-                        <div class="form-group">
-                            <label for="searchIP">搜索IP</label>
-                            <input type="text" class="form-control" id="searchIP" placeholder="输入IP地址">
-                        </div>
-                        <button type="submit" class="btn btn-primary">搜索</button>
-                    </form>
-                    <div id="searchResults" class="mt-3"></div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-success">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h5>运行中任务</h5>
+                        <h2>{{ stats.running_tasks }}</h2>
+                    </div>
+                    <div class="icon">
+                        <i class="fas fa-running fa-2x"></i>
+                    </div>
                 </div>
             </div>
-            
-            <div class="card">
-                <div class="card-header">
-                    <h3>创建扫描任务</h3>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-warning">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h5>资产数量</h5>
+                        <h2>{{ stats.total_assets }}</h2>
+                    </div>
+                    <div class="icon">
+                        <i class="fas fa-server fa-2x"></i>
+                    </div>
                 </div>
-                <div class="card-body">
-                    <form method="POST">
-                        {{ form.hidden_tag() }}
-                        <div class="form-group">
-                            {{ form.name.label(class="form-label") }}
-                            {{ form.name(class="form-control") }}
-                            {% for error in form.name.errors %}
-                                <div class="text-danger">{{ error }}</div>
-                            {% endfor %}
-                        </div>
-                        
-                        <div class="form-group">
-                            <label>选择资产或手动输入IP</label>
-                            {{ form.asset(class="form-control mb-2") }}
-                            <small class="form-text text-muted">选择一个预定义资产或手动输入IP地址</small>
-                            {{ form.ips(class="form-control", rows=5, placeholder="手动输入IP地址(多个IP请换行分隔)") }}
-                            {% for error in form.ips.errors %}
-                                <div class="text-danger">{{ error }}</div>
-                            {% endfor %}
-                        </div>
-                        
-                        <div class="form-group">
-                            <label>选择参数模板或手动输入参数</label>
-                            {{ form.template(class="form-control mb-2") }}
-                            <small class="form-text text-muted">选择一个预定义参数模板或手动输入Nmap参数</small>
-                            {{ form.params(class="form-control") }}
-                            {% for error in form.params.errors %}
-                                <div class="text-danger">{{ error }}</div>
-                            {% endfor %}
-                        </div>
-                        
-                        <div class="form-group form-check">
-                            {{ form.send_email(class="form-check-input") }}
-                            {{ form.send_email.label(class="form-check-label") }}
-                        </div>
-                        
-                        <div class="form-group">
-                            {{ form.email.label(class="form-label") }}
-                            {{ form.email(class="form-control") }}
-                            {% for error in form.email.errors %}
-                                <div class="text-danger">{{ error }}</div>
-                            {% endfor %}
-                        </div>
-                        
-                        <div class="form-group">
-                            {{ form.threads.label(class="form-label") }}
-                            {{ form.threads(class="form-control") }}
-                            {% for error in form.threads.errors %}
-                                <div class="text-danger">{{ error }}</div>
-                            {% endfor %}
-                        </div>
-                        
-                        <div class="form-group">
-                            {{ form.schedule.label(class="form-label") }}
-                            {{ form.schedule(class="form-control") }}
-                            <small class="form-text text-muted">设置任务执行间隔（分钟），0表示只执行一次</small>
-                            {% for error in form.schedule.errors %}
-                                <div class="text-danger">{{ error }}</div>
-                            {% endfor %}
-                        </div>
-                        
-                        <div class="form-group">
-                            {{ form.submit(class="btn btn-primary") }}
-                        </div>
-                    </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-info">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h5>发现端口</h5>
+                        <h2>{{ stats.total_ports }}</h2>
+                    </div>
+                    <div class="icon">
+                        <i class="fas fa-plug fa-2x"></i>
+                    </div>
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 快捷操作 -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h3><i class="fas fa-bolt"></i> 快捷操作</h3>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <a href="{{ url_for('index') }}?action=create" class="btn btn-primary btn-lg">
+                        <i class="fas fa-plus-circle"></i> 创建扫描任务
+                    </a>
+                    <a href="/tasks" class="btn btn-outline-primary btn-lg">
+                        <i class="fas fa-tasks"></i> 查看所有任务
+                    </a>
+                    <a href="/assets" class="btn btn-outline-primary btn-lg">
+                        <i class="fas fa-server"></i> 管理资产
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 最近任务 -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h3><i class="fas fa-history"></i> 最近任务</h3>
+            </div>
+            <div class="card-body">
+                {% if recent_tasks %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>任务名称</th>
+                                <th>状态</th>
+                                <th>创建时间</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for task in recent_tasks %}
+                            <tr>
+                                <td>{{ task.name }}</td>
+                                <td>
+                                    {% if task.status == 'running' %}
+                                        <span class="badge bg-warning">运行中</span>
+                                    {% elif task.status == 'completed' %}
+                                        <span class="badge bg-success">已完成</span>
+                                    {% elif task.status == 'failed' %}
+                                        <span class="badge bg-danger">失败</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">{{ task.status }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ task.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                                <td>
+                                    <a href="/task/{{ task.id }}" class="btn btn-sm btn-outline-primary">
+                                        <i class="fas fa-eye"></i> 查看
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted">暂无任务</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 创建任务表单 -->
+{% if request.args.get('action') == 'create' or not request.args %}
+<div class="card">
+    <div class="card-header">
+        <h3><i class="fas fa-plus-circle"></i> 创建扫描任务</h3>
+    </div>
+    <div class="card-body">
+        <form method="POST" id="taskForm">
+            {{ form.hidden_tag() }}
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        {{ form.name.label(class="form-label") }}
+                        {{ form.name(class="form-control") }}
+                        {% if form.name.errors %}
+                            <div class="text-danger">
+                                {% for error in form.name.errors %}
+                                    <small>{{ error }}</small>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                    <div class="mb-3">
+                        {{ form.asset_id.label(class="form-label") }}
+                        {{ form.asset_id(class="form-select") }}
+                        <div class="form-text">选择现有资产或在下方手动输入IP地址</div>
+                        {% if form.asset_id.errors %}
+                            <div class="text-danger">
+                                {% for error in form.asset_id.errors %}
+                                    <small>{{ error }}</small>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                    <div class="mb-3">
+                        {{ form.custom_ips.label(class="form-label") }}
+                        {{ form.custom_ips(class="form-control", rows="5") }}
+                        <div class="form-text">可以输入单个IP、IP范围或CIDR格式，每行一个</div>
+                        {% if form.custom_ips.errors %}
+                            <div class="text-danger">
+                                {% for error in form.custom_ips.errors %}
+                                    <small>{{ error }}</small>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        {{ form.template_id.label(class="form-label") }}
+                        {{ form.template_id(class="form-select") }}
+                        {% if form.template_id.errors %}
+                            <div class="text-danger">
+                                {% for error in form.template_id.errors %}
+                                    <small>{{ error }}</small>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                    <div class="mb-3">
+                        <label for="custom_params" class="form-label">手动输入参数</label>
+                        <textarea name="custom_params" id="custom_params" class="form-control" rows="3" placeholder="如果不选择参数模板，可以在此处手动输入参数，例如: -p 1-1000 -sV"></textarea>
+                        <div class="form-text">如果未选择参数模板，则使用此处输入的参数</div>
+                    </div>
+                    <div class="mb-3 form-check">
+                        {{ form.send_email(class="form-check-input") }}
+                        {{ form.send_email.label(class="form-check-label") }}
+                        {% if form.send_email.errors %}
+                            <div class="text-danger">
+                                {% for error in form.send_email.errors %}
+                                    <small>{{ error }}</small>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                    <div class="mb-3" id="email-field" style="display: none;">
+                        {{ form.email_address.label(class="form-label") }}
+                        {{ form.email_address(class="form-control") }}
+                        {% if form.email_address.errors %}
+                            <div class="text-danger">
+                                {% for error in form.email_address.errors %}
+                                    <small>{{ error }}</small>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                    <div class="mb-3">
+                        {{ form.schedule_type.label(class="form-label") }}
+                        {{ form.schedule_type(class="form-select") }}
+                        {% if form.schedule_type.errors %}
+                            <div class="text-danger">
+                                {% for error in form.schedule_type.errors %}
+                                    <small>{{ error }}</small>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            <div class="d-grid">
+                {{ form.submit(class="btn btn-primary btn-lg", id="submitBtn") }}
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+
+<!-- 图表区域 -->
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h3><i class="fas fa-chart-bar"></i> 任务状态分布</h3>
+            </div>
+            <div class="card-body">
+                <canvas id="taskStatusChart" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h3><i class="fas fa-chart-line"></i> 本周活动</h3>
+            </div>
+            <div class="card-body">
+                <canvas id="weeklyActivityChart" height="300"></canvas>
             </div>
         </div>
     </div>
@@ -130,198 +294,289 @@
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/chart.min.js') }}"></script>
 <script>
+// 显示/隐藏调度字段
+var isScheduledCheckbox = document.getElementById('is_scheduled');
+var scheduleFields = document.getElementById('schedule-fields');
+
+if (isScheduledCheckbox && scheduleFields) {
+    isScheduledCheckbox.addEventListener('change', function() {
+        scheduleFields.style.display = this.checked ? 'block' : 'none';
+    });
+}
+
+// 初始化图表和表单交互
 document.addEventListener('DOMContentLoaded', function() {
-    // 获取资产和模板选择框
-    const assetSelect = document.getElementById('asset');
-    const ipsTextarea = document.getElementById('ips');
-    const templateSelect = document.getElementById('template');
-    const paramsInput = document.getElementById('params');
+    console.log("页面加载完成");
     
-    // 资产选择事件
-    assetSelect.addEventListener('change', function() {
-        if (this.value !== '-1') {
-            // 如果选择了资产，禁用IP输入框
-            ipsTextarea.disabled = true;
-            ipsTextarea.placeholder = '已选择资产，此处禁用';
-        } else {
-            // 如果未选择资产，启用IP输入框
-            ipsTextarea.disabled = false;
-            ipsTextarea.placeholder = '手动输入IP地址(多个IP请换行分隔)';
+    // 邮箱字段显示逻辑
+    const sendEmailCheckbox = document.getElementById('send_email');
+    const emailField = document.getElementById('email-field');
+    
+    if (sendEmailCheckbox && emailField) {
+        sendEmailCheckbox.addEventListener('change', function() {
+            if (this.checked) {
+                emailField.style.display = 'block';
+            } else {
+                emailField.style.display = 'none';
+            }
+        });
+        
+        // 初始化时根据复选框状态显示/隐藏邮箱字段
+        if (sendEmailCheckbox.checked) {
+            emailField.style.display = 'block';
         }
-    });
+    }
     
-    // 模板选择事件
-    templateSelect.addEventListener('change', function() {
-        if (this.value !== '-1') {
-            // 如果选择了模板，禁用参数输入框
-            paramsInput.disabled = true;
-            paramsInput.placeholder = '已选择模板，此处禁用';
-        } else {
-            // 如果未选择模板，启用参数输入框
-            paramsInput.disabled = false;
-            paramsInput.placeholder = '手动输入Nmap参数';
+    // 资产和IP输入框的交互
+    const assetSelect = document.getElementById('asset_id');
+    const customIpsTextarea = document.getElementById('custom_ips');
+    const templateSelect = document.getElementById('template_id');
+    
+    if (assetSelect && customIpsTextarea) {
+        // 监听资产选择变化
+        assetSelect.addEventListener('change', function() {
+            console.log("资产选择变更:", this.value);
+            if (this.value !== "-1" && this.value !== "") {
+                // 如果选择了资产，禁用自定义IP输入框
+                customIpsTextarea.disabled = true;
+                customIpsTextarea.placeholder = "选择资产时不能手动输入IP";
+            } else {
+                // 如果没有选择资产，启用自定义IP输入框
+                customIpsTextarea.disabled = false;
+                customIpsTextarea.placeholder = "可以输入单个IP、IP范围或CIDR格式，每行一个";
+            }
+        });
+        
+        // 监听自定义IP输入框变化
+        customIpsTextarea.addEventListener('input', function() {
+            console.log("自定义IP输入框变更:", this.value);
+            if (this.value.trim() !== "") {
+                // 如果有自定义IP，选择"不选择"选项
+                assetSelect.value = "-1";
+            } else if (assetSelect.value === "-1") {
+                // 如果没有自定义IP且当前是"不选择"，保持原状
+                // 这里不强制改变资产选择状态
+            }
+        });
+        
+        // 初始化状态
+        if (customIpsTextarea.value.trim() !== "") {
+            assetSelect.value = "-1";
+        } else if (assetSelect.value !== "-1" && assetSelect.value !== "") {
+            customIpsTextarea.disabled = true;
+            customIpsTextarea.placeholder = "选择资产时不能手动输入IP";
         }
-    });
+    }
     
-    // 获取全局数据分析数据
-    fetch('?action=analytics')
-        .then(response => response.json())
-        .then(data => {
-            // 绘制端口趋势图
-            const portTrendCtx = document.getElementById('portTrendChart').getContext('2d');
-            const portTrendChart = new Chart(portTrendCtx, {
-                type: 'line',
-                data: {
-                    labels: Object.keys(data.port_trend),
-                    datasets: [{
-                        label: '端口数量',
-                        data: Object.values(data.port_trend),
-                        borderColor: 'rgb(75, 192, 192)',
-                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                        tension: 0.1
-                    }]
+    // 任务状态分布图
+    var statusCtx = document.getElementById('taskStatusChart');
+    if (statusCtx) {
+        statusCtx = statusCtx.getContext('2d');
+        var statusChart = new Chart(statusCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['运行中', '已完成', '失败', '待处理'],
+                datasets: [{
+                    data: [{{ stats.running_tasks }}, {{ stats.completed_tasks }}, {{ stats.failed_tasks }}, {{ stats.pending_tasks }}],
+                    backgroundColor: [
+                        '#ffc107',
+                        '#28a745',
+                        '#dc3545',
+                        '#6c757d'
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                    }
+                }
+            }
+        });
+    }
+    
+    // 本周活动图
+    var activityCtx = document.getElementById('weeklyActivityChart');
+    if (activityCtx) {
+        activityCtx = activityCtx.getContext('2d');
+        var activityChart = new Chart(activityCtx, {
+            type: 'line',
+            data: {
+                labels: {{ weekly_activity.labels|tojson }},
+                datasets: [{
+                    label: '创建任务数',
+                    data: {{ weekly_activity.data|tojson }},
+                    borderColor: '#4361ee',
+                    backgroundColor: 'rgba(67, 97, 238, 0.1)',
+                    fill: true,
+                    tension: 0.3
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
                 },
-                options: {
-                    responsive: true,
-                    plugins: {
-                        legend: {
-                            position: 'top',
-                        },
-                        title: {
-                            display: true,
-                            text: '端口扫描趋势'
-                        }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: true
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            precision: 0
                         }
                     }
                 }
-            });
+            }
+        });
+    }
+    
+    // 表单提交前验证
+    const taskForm = document.getElementById('taskForm');
+    const submitBtn = document.getElementById('submitBtn');
+    
+    if (taskForm && submitBtn) {
+        taskForm.addEventListener('submit', function(e) {
+            console.log("表单提交事件触发");
             
-            // 绘制服务分布图
-            const serviceDistributionCtx = document.getElementById('serviceDistributionChart').getContext('2d');
-            const serviceDistributionChart = new Chart(serviceDistributionCtx, {
-                type: 'pie',
-                data: {
-                    labels: Object.keys(data.service_distribution),
-                    datasets: [{
-                        label: '服务分布',
-                        data: Object.values(data.service_distribution),
-                        backgroundColor: [
-                            'rgba(255, 99, 132, 0.2)',
-                            'rgba(54, 162, 235, 0.2)',
-                            'rgba(255, 206, 86, 0.2)',
-                            'rgba(75, 192, 192, 0.2)',
-                            'rgba(153, 102, 255, 0.2)',
-                            'rgba(255, 159, 64, 0.2)'
-                        ],
-                        borderColor: [
-                            'rgba(255, 99, 132, 1)',
-                            'rgba(54, 162, 235, 1)',
-                            'rgba(255, 206, 86, 1)',
-                            'rgba(75, 192, 192, 1)',
-                            'rgba(153, 102, 255, 1)',
-                            'rgba(255, 159, 64, 1)'
-                        ],
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    plugins: {
-                        legend: {
-                            position: 'top',
-                        },
-                        title: {
-                            display: true,
-                            text: '服务类型分布'
-                        }
-                    }
-                }
-            });
+            // 显示提交状态
+            submitBtn.disabled = true;
+            const originalText = submitBtn.innerHTML;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 提交中...';
+            
+            const assetId = document.getElementById('asset_id').value;
+            const customIps = document.getElementById('custom_ips').value.trim();
+            
+            console.log("资产ID:", assetId);
+            console.log("自定义IP:", customIps);
+            
+            // 检查是否至少提供了一种IP来源
+            if ((assetId === "-1" || assetId === "") && customIps === "") {
+                e.preventDefault();
+                alert('请提供要扫描的IP地址，可以通过选择资产或手动输入');
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+                return false;
+            }
+            
+            console.log("表单验证通过，准备提交");
         });
-    
-    // 获取扫描概况数据
-    fetch('?action=overview')
+    } else {
+        console.log("无法找到表单或提交按钮");
+    }
+});
+
+// 添加执行任务的JavaScript函数
+function executeTask(taskId) {
+    // 发送AJAX请求执行任务
+    fetch(`/execute_task/${taskId}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrf_token]').value
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // 更新任务状态为运行中
+            const row = document.querySelector(`[onclick="executeTask(${taskId})"]`).closest('tr');
+            const statusCell = row.querySelector('td:nth-child(4)');
+            statusCell.innerHTML = '<span class="badge bg-warning">运行中</span>';
+            
+            // 显示进度条
+            const progressCell = row.querySelector('td:nth-child(6)');
+            progressCell.innerHTML += '<div class="progress mt-1" style="width: 100px;"><div class="progress-bar" role="progressbar" style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div></div>';
+            
+            // 开始轮询进度
+            pollProgress(taskId, row);
+        } else {
+            alert('执行失败: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('执行失败，请重试');
+    });
+}
+
+// 轮询任务进度
+function pollProgress(taskId, row) {
+    fetch(`/get_progress/${taskId}`)
+    .then(response => response.json())
+    .then(data => {
+        if (data.progress !== null) {
+            const progressElement = row.querySelector('.progress-bar');
+            if (progressElement) {
+                progressElement.style.width = data.progress + '%';
+                progressElement.textContent = data.progress + '%';
+                
+                // 如果进度达到100%，更新状态为已完成
+                if (data.progress === 100) {
+                    const statusCell = row.querySelector('td:nth-child(4)');
+                    statusCell.innerHTML = '<span class="badge bg-success">已完成</span>';
+                }
+            }
+        }
+        
+        // 继续轮询，每秒一次
+        setTimeout(() => pollProgress(taskId, row), 1000);
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        // 如果获取进度失败，停止轮询
+    });
+}
+
+// 查看IP地址
+function showIPs(taskId) {
+    fetch(`/get_ips/${taskId}`)
+    .then(response => response.json())
+    .then(data => {
+        if (data.ips) {
+            alert('IP地址:\n' + data.ips.join('\n'));
+        } else {
+            alert('未找到IP地址');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('获取IP地址失败');
+    });
+}
+
+// 查看任务详情
+function viewTask(taskId) {
+    window.location.href = `/task/${taskId}`;
+}
+
+// 删除任务
+function deleteTask(taskId) {
+    if (confirm('确定要删除这个任务吗？')) {
+        fetch(`/delete_task/${taskId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrf_token]').value
+            }
+        })
         .then(response => response.json())
         .then(data => {
-            const overviewHtml = `
-                <div class="col-md-4">
-                    <div class="alert alert-info">
-                        <h5>总任务数</h5>
-                        <p>${data.total_tasks}</p>
-                    </div>
-                </div>
-                <div class="col-md-4">
-                    <div class="alert alert-success">
-                        <h5>完成任务</h5>
-                        <p>${data.completed_tasks}</p>
-                    </div>
-                </div>
-                <div class="col-md-4">
-                    <div class="alert alert-warning">
-                        <h5>扫描端口</h5>
-                        <p>${data.total_ports}</p>
-                    </div>
-                </div>
-            `;
-            document.getElementById('scanOverview').innerHTML = overviewHtml;
+            if (data.success) {
+                // 删除行
+                const row = document.querySelector(`[onclick="deleteTask(${taskId})"]`).closest('tr');
+                row.remove();
+            } else {
+                alert('删除失败: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('删除失败');
         });
-    
-    // 全局搜索功能
-    document.getElementById('searchForm').addEventListener('submit', function(e) {
-        e.preventDefault();
-        const ip = document.getElementById('searchIP').value;
-        if (ip) {
-            fetch(`?action=search&ip=${encodeURIComponent(ip)}`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.ports && data.ports.length > 0) {
-                        let html = '<h5>端口趋势分析</h5>';
-                        html += '<canvas id="ipTrendChart" width="400" height="200"></canvas>';
-                        
-                        document.getElementById('searchResults').innerHTML = html;
-                        
-                        // 绘制IP端口趋势图
-                        const ipTrendCtx = document.getElementById('ipTrendChart').getContext('2d');
-                        const ipTrendChart = new Chart(ipTrendCtx, {
-                            type: 'line',
-                            data: {
-                                labels: data.dates,
-                                datasets: [{
-                                    label: '端口数量',
-                                    data: data.port_counts,
-                                    borderColor: 'rgb(255, 99, 132)',
-                                    backgroundColor: 'rgba(255, 99, 132, 0.2)',
-                                    tension: 0.1
-                                }]
-                            },
-                            options: {
-                                responsive: true,
-                                plugins: {
-                                    legend: {
-                                        position: 'top',
-                                    },
-                                    title: {
-                                        display: true,
-                                        text: `IP ${ip} 端口趋势`
-                                    }
-                                },
-                                scales: {
-                                    y: {
-                                        beginAtZero: true
-                                    }
-                                }
-                            }
-                        });
-                    } else {
-                        document.getElementById('searchResults').innerHTML = '<p class="text-muted">未找到相关数据</p>';
-                    }
-                });
-        }
-    });
-});
+    }
+}
 </script>
 {% endblock %}

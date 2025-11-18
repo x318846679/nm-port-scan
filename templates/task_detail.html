@@ -1,188 +1,444 @@
 {% extends "layout.html" %}
 
 {% block content %}
-<div class="container mt-5">
-    <div class="row">
-        <div class="col-md-12">
-            <h1 class="mb-4">任务详情</h1>
-            <div class="card mb-4">
-                <div class="card-header">
-                    <h2>{{ task.name }}</h2>
-                </div>
-                <div class="card-body">
-                    <p><strong>参数:</strong> {{ task.params }}</p>
-                    {% if task.template %}
-                    <p><strong>参数模板:</strong> {{ task.template.name }}</p>
-                    {% endif %}
-                    <p><strong>邮件发送:</strong> {{ '是' if task.send_email else '否'
-                        }}</p>
-                    <p><strong>创建时间:</strong> {{ task.created_at }}</p>
-                    <p><strong>创建者:</strong> {{ task.creator.username
-                        }}</p>
-                    
-                    {% if task.asset %}
-                    <p><strong>资产:</strong> {{ task.asset.name }}</p>
-                    {% endif %}
+<div class="header">
+    <h1><i class="fas fa-info-circle"></i> 任务详情</h1>
+    <p>查看任务 {{ task.name }} 的详细信息和扫描结果</p>
+</div>
 
-                    <p><strong>IP地址:</strong></p>
-                    <textarea class="form-control" rows="5"
-                        readonly>{{ task.ips }}</textarea>
-                </div>
-                <div class="card-footer">
-                    <button id="exportButton"
-                        class="btn btn-primary">导出端口数据为Excel</button>
-                </div>
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body text-center">
+                <h5>任务状态</h5>
+                {% if task.status == 'running' %}
+                    <h2><span class="badge bg-warning">运行中</span></h2>
+                {% elif task.status == 'completed' %}
+                    <h2><span class="badge bg-success">已完成</span></h2>
+                {% elif task.status == 'failed' %}
+                    <h2><span class="badge bg-danger">失败</span></h2>
+                {% else %}
+                    <h2><span class="badge bg-secondary">{{ task.status }}</span></h2>
+                {% endif %}
             </div>
-            
-            {% if diff_data %}
-            <div class="card mb-4">
-                <div class="card-header">
-                    <h3>与上次扫描对比</h3>
-                </div>
-                <div class="card-body">
-                    <p><strong>上次扫描任务:</strong> {{ diff_data.previous_task.name }} ({{ diff_data.previous_task.created_at }})</p>
-                    <div class="row">
-                        <div class="col-md-4">
-                            <h4>新增端口 ({{ diff_data.added_ports|length }})</h4>
-                            {% if diff_data.added_ports %}
-                            <table class="table table-striped">
-                                <thead>
-                                    <tr>
-                                        <th>IP</th>
-                                        <th>协议</th>
-                                        <th>端口</th>
-                                        <th>服务</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for port in diff_data.added_ports %}
-                                    <tr>
-                                        <td>{{ port.ip }}</td>
-                                        <td>{{ port.agree }}</td>
-                                        <td>{{ port.port }}</td>
-                                        <td>{{ port.name }}</td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                            {% else %}
-                            <p>无新增端口</p>
-                            {% endif %}
-                        </div>
-                        <div class="col-md-4">
-                            <h4>减少端口 ({{ diff_data.removed_ports|length }})</h4>
-                            {% if diff_data.removed_ports %}
-                            <table class="table table-striped">
-                                <thead>
-                                    <tr>
-                                        <th>IP</th>
-                                        <th>协议</th>
-                                        <th>端口</th>
-                                        <th>服务</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for port in diff_data.removed_ports %}
-                                    <tr>
-                                        <td>{{ port.ip }}</td>
-                                        <td>{{ port.agree }}</td>
-                                        <td>{{ port.port }}</td>
-                                        <td>{{ port.name }}</td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                            {% else %}
-                            <p>无减少端口</p>
-                            {% endif %}
-                        </div>
-                        <div class="col-md-4">
-                            <h4>保持不变的端口 ({{ diff_data.unchanged_ports|length }})</h4>
-                            {% if diff_data.unchanged_ports %}
-                            <table class="table table-striped">
-                                <thead>
-                                    <tr>
-                                        <th>IP</th>
-                                        <th>协议</th>
-                                        <th>端口</th>
-                                        <th>服务</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for port in diff_data.unchanged_ports %}
-                                    <tr>
-                                        <td>{{ port.ip }}</td>
-                                        <td>{{ port.agree }}</td>
-                                        <td>{{ port.port }}</td>
-                                        <td>{{ port.name }}</td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                            {% else %}
-                            <p>无保持不变的端口</p>
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body text-center">
+                <h5>发现端口</h5>
+                <h2>{{ ports_data|length }}</h2>
             </div>
-            {% endif %}
-            
-            <div class="card mb-4">
-                <div class="card-header">
-                    <h3>数据可视化</h3>
-                </div>
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <h4>服务类型分布</h4>
-                            <canvas id="serviceChart" width="400" height="400"></canvas>
-                        </div>
-                        <div class="col-md-6">
-                            <h4>端口变化趋势</h4>
-                            <canvas id="trendChart" width="400" height="400"></canvas>
-                        </div>
-                    </div>
-                </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body text-center">
+                <h5>目标IP数</h5>
+                <h2>{{ task.ips.split('\n')|length }}</h2>
             </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body text-center">
+                <h5>创建时间</h5>
+                <h2>{{ task.created_at.strftime('%m-%d') }}</h2>
+            </div>
+        </div>
+    </div>
+</div>
 
-            <div class="card">
-                <div class="card-header">
-                    <h3>端口数据</h3>
-                </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-striped mt-4" id="portTable">
-                            <thead>
-                                <tr>
-                                    <th>IP</th>
-                                    <th>协议</th>
-                                    <th>端口</th>
-                                    <th>服务</th>
-                                    <th>Banner</th>
-                                </tr>
-                            </thead>
-                            <tbody id="portTableBody">
-                                <!-- 数据将通过JavaScript动态加载 -->
-                            </tbody>
+<ul class="nav nav-tabs mb-4" id="taskTab" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="overview-tab" data-bs-toggle="tab" data-bs-target="#overview" type="button" role="tab">
+            <i class="fas fa-eye"></i> 概览
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="results-tab" data-bs-toggle="tab" data-bs-target="#results" type="button" role="tab">
+            <i class="fas fa-table"></i> 扫描结果
+        </button>
+    </li>
+    {% if diff_data %}
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="diff-tab" data-bs-toggle="tab" data-bs-target="#diff" type="button" role="tab">
+            <i class="fas fa-exchange-alt"></i> 对比分析
+        </button>
+    </li>
+    {% endif %}
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="visual-tab" data-bs-toggle="tab" data-bs-target="#visual" type="button" role="tab">
+            <i class="fas fa-chart-pie"></i> 数据可视化
+        </button>
+    </li>
+</ul>
+
+<div class="tab-content" id="taskTabContent">
+    <!-- 概览标签页 -->
+    <div class="tab-pane fade show active" id="overview" role="tabpanel">
+        <div class="card">
+            <div class="card-header">
+                <h3>任务信息</h3>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h5>基本信息</h5>
+                        <table class="table">
+                            <tr>
+                                <td><strong>任务ID:</strong></td>
+                                <td>{{ task.id }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>任务名称:</strong></td>
+                                <td>{{ task.name }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>创建时间:</strong></td>
+                                <td>{{ task.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                            </tr>
+                                                       <tr>
+                                <td><strong>状态:</strong></td>
+                                <td>
+                                    {% if task.status == 'running' %}
+                                        <span class="badge bg-warning">运行中</span>
+                                    {% elif task.status == 'completed' %}
+                                        <span class="badge bg-success">已完成</span>
+                                    {% elif task.status == 'failed' %}
+                                        <span class="badge bg-danger">失败</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">{{ task.status }}</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% if task.schedule_type != 'once' %}
+                            <tr>
+                                <td><strong>调度类型:</strong></td>
+                                <td>
+                                    {% if task.schedule_type == 'daily' %}
+                                        每天
+                                    {% elif task.schedule_type == 'weekly' %}
+                                        每周
+                                    {% elif task.schedule_type == 'monthly' %}
+                                        每月
+                                    {% else %}
+                                        {{ task.schedule_type }}
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>上次执行时间:</strong></td>
+                                <td>
+                                    {% if task.last_run_at %}
+                                        {{ task.last_run_at.strftime('%Y-%m-%d %H:%M:%S') }}
+                                    {% else %}
+                                        未执行
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>下次执行时间:</strong></td>
+                                <td>
+                                    {% if task.next_run_at %}
+                                        {{ task.next_run_at.strftime('%Y-%m-%d %H:%M:%S') }}
+                                    {% else %}
+                                        未安排
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endif %}
                         </table>
                     </div>
-                    
-                    <!-- 分页控件 -->
-                    <div class="d-flex justify-content-between align-items-center mt-3">
-                        <div>
-                            <span>每页显示: </span>
-                            <select id="pageSize" class="form-select d-inline w-auto">
-                                <option value="10">10</option>
-                                <option value="25" selected>25</option>
-                                <option value="50">50</option>
-                                <option value="100">100</option>
-                            </select>
+                    <div class="col-md-6">
+                        <h5>扫描目标</h5>
+                        <div class="bg-light p-3 rounded">
+                            {% for ip in task.ips.split('\n') %}
+                                <span class="badge bg-secondary me-1 mb-1">{{ ip }}</span>
+                            {% endfor %}
                         </div>
-                        <div>
-                            <button id="prevPage" class="btn btn-secondary">上一页</button>
-                            <span id="pageInfo" class="mx-2">第 1 页，共 1 页</span>
-                            <button id="nextPage" class="btn btn-secondary">下一页</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 扫描结果标签页 -->
+    <div class="tab-pane fade" id="results" role="tabpanel">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h3>端口扫描结果</h3>
+                <button id="exportButton" class="btn btn-success">
+                    <i class="fas fa-file-export"></i> 导出Excel
+                </button>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>IP</th>
+                                <th>协议</th>
+                                <th>端口</th>
+                                <th>服务</th>
+                                <th>Banner</th>
+                            </tr>
+                        </thead>
+                        <tbody id="portTableBody">
+                            {% for host in ports_data %}
+                            <tr>
+                                <td>{{ host.host }}</td>
+                                <td>
+                                    {% for port in host.ports %}
+                                    <div>{{ port.protocol }}</div>
+                                    {% endfor %}
+                                </td>
+                                <td>
+                                    {% for port in host.ports %}
+                                    <div>{{ port.port }}</div>
+                                    {% endfor %}
+                                </td>
+                                <td>
+                                    {% for port in host.ports %}
+                                    <div>{{ port.service }}</div>
+                                    {% endfor %}
+                                </td>
+                                <td>
+                                    {% for port in host.ports %}
+                                    <div>{{ port.product }} {{ port.version }}</div>
+                                    {% endfor %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- 分页控件 -->
+                <div class="d-flex justify-content-between align-items-center mt-3">
+                    <div>
+                        <span>每页显示: </span>
+                        <select id="pageSize" class="form-select d-inline w-auto">
+                            <option value="10">10</option>
+                            <option value="25" selected>25</option>
+                            <option value="50">50</option>
+                            <option value="100">100</option>
+                        </select>
+                    </div>
+                    <div>
+                        <button id="prevPage" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left"></i> 上一页
+                        </button>
+                        <span id="pageInfo" class="mx-2">第 1 页，共 1 页</span>
+                        <button id="nextPage" class="btn btn-secondary">
+                            下一页 <i class="fas fa-arrow-right"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 对比分析标签页 -->
+    {% if diff_data %}
+    <div class="tab-pane fade" id="diff" role="tabpanel">
+        <div class="card">
+            <div class="card-header">
+                <h3>与上次扫描对比</h3>
+            </div>
+            <div class="card-body">
+                <p><strong>上次扫描任务:</strong> {{ diff_data.previous_task.name }} ({{ diff_data.previous_task.created_at }})</p>
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="card">
+                            <div class="card-header bg-success text-white">
+                                <h4 class="mb-0">新增端口 (<span id="added-count">{{ diff_data.added_ports|length }}</span>)</h4>
+                            </div>
+                            <div class="card-body">
+                                {% if diff_data.added_ports %}
+                                <div class="table-responsive">
+                                    <table class="table table-striped" id="added-ports-table">
+                                        <thead>
+                                            <tr>
+                                                <th>IP</th>
+                                                <th>协议</th>
+                                                <th>端口</th>
+                                                <th>服务</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="added-ports-body">
+                                            {% for port in diff_data.added_ports %}
+                                            <tr>
+                                                <td>{{ port.host }}</td>
+                                                <td>{{ port.protocol }}</td>
+                                                <td>{{ port.port }}</td>
+                                                <td>{{ port.service }}</td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center mt-2">
+                                    <div>
+                                        <select class="form-select d-inline w-auto diff-page-size" data-type="added">
+                                            <option value="5">5</option>
+                                            <option value="10" selected>10</option>
+                                            <option value="25">25</option>
+                                            <option value="50">50</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <button class="btn btn-secondary btn-sm diff-prev-page" data-type="added">
+                                            <i class="fas fa-arrow-left"></i>
+                                        </button>
+                                        <span class="mx-2 diff-page-info" data-type="added">第 1 页</span>
+                                        <button class="btn btn-secondary btn-sm diff-next-page" data-type="added">
+                                            <i class="fas fa-arrow-right"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                {% else %}
+                                <p class="text-muted">无新增端口</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card">
+                            <div class="card-header bg-danger text-white">
+                                <h4 class="mb-0">减少端口 (<span id="removed-count">{{ diff_data.removed_ports|length }}</span>)</h4>
+                            </div>
+                            <div class="card-body">
+                                {% if diff_data.removed_ports %}
+                                <div class="table-responsive">
+                                    <table class="table table-striped" id="removed-ports-table">
+                                        <thead>
+                                            <tr>
+                                                <th>IP</th>
+                                                <th>协议</th>
+                                                <th>端口</th>
+                                                <th>服务</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="removed-ports-body">
+                                            {% for port in diff_data.removed_ports %}
+                                            <tr>
+                                                <td>{{ port.host }}</td>
+                                                <td>{{ port.protocol }}</td>
+                                                <td>{{ port.port }}</td>
+                                                <td>{{ port.service }}</td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center mt-2">
+                                    <div>
+                                        <select class="form-select d-inline w-auto diff-page-size" data-type="removed">
+                                            <option value="5">5</option>
+                                            <option value="10" selected>10</option>
+                                            <option value="25">25</option>
+                                            <option value="50">50</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <button class="btn btn-secondary btn-sm diff-prev-page" data-type="removed">
+                                            <i class="fas fa-arrow-left"></i>
+                                        </button>
+                                        <span class="mx-2 diff-page-info" data-type="removed">第 1 页</span>
+                                        <button class="btn btn-secondary btn-sm diff-next-page" data-type="removed">
+                                            <i class="fas fa-arrow-right"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                {% else %}
+                                <p class="text-muted">无减少端口</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card">
+                            <div class="card-header bg-info text-white">
+                                <h4 class="mb-0">保持不变的端口 (<span id="unchanged-count">{{ diff_data.unchanged_ports|length }}</span>)</h4>
+                            </div>
+                            <div class="card-body">
+                                {% if diff_data.unchanged_ports %}
+                                <div class="table-responsive">
+                                    <table class="table table-striped" id="unchanged-ports-table">
+                                        <thead>
+                                            <tr>
+                                                <th>IP</th>
+                                                <th>协议</th>
+                                                <th>端口</th>
+                                                <th>服务</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="unchanged-ports-body">
+                                            {% for port in diff_data.unchanged_ports %}
+                                            <tr>
+                                                <td>{{ port.host }}</td>
+                                                <td>{{ port.protocol }}</td>
+                                                <td>{{ port.port }}</td>
+                                                <td>{{ port.service }}</td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center mt-2">
+                                    <div>
+                                        <select class="form-select d-inline w-auto diff-page-size" data-type="unchanged">
+                                            <option value="5">5</option>
+                                            <option value="10" selected>10</option>
+                                            <option value="25">25</option>
+                                            <option value="50">50</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <button class="btn btn-secondary btn-sm diff-prev-page" data-type="unchanged">
+                                            <i class="fas fa-arrow-left"></i>
+                                        </button>
+                                        <span class="mx-2 diff-page-info" data-type="unchanged">第 1 页</span>
+                                        <button class="btn btn-secondary btn-sm diff-next-page" data-type="unchanged">
+                                            <i class="fas fa-arrow-right"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                {% else %}
+                                <p class="text-muted">无保持不变的端口</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- 数据可视化标签页 -->
+    <div class="tab-pane fade" id="visual" role="tabpanel">
+        <div class="card">
+            <div class="card-header">
+                <h3>数据可视化</h3>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-body">
+                                <h4 class="text-center">服务类型分布</h4>
+                                <canvas id="serviceChart" width="400" height="400"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-body">
+                                <h4 class="text-center">端口变化趋势</h4>
+                                <canvas id="trendChart" width="400" height="400"></canvas>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -201,152 +457,428 @@ var portsData = {{ ports_data|tojson }};
 var diffData = {{ diff_data|tojson if diff_data else "{}" }};
 var historyData = {{ history_data|tojson if history_data else "[]" }};
 
+// 确保数据是数组格式
+if (!Array.isArray(portsData)) {
+    portsData = [];
+}
+
+if (!Array.isArray(historyData)) {
+    historyData = [];
+}
+
+// 展平嵌套数据结构以便在表格中显示
+var flatPortsData = [];
+portsData.forEach(function(host) {
+    if (host.ports && Array.isArray(host.ports)) {
+        host.ports.forEach(function(port) {
+            flatPortsData.push({
+                host: host.host || 'N/A',
+                hostname: host.hostname || 'N/A',
+                state: host.state || 'N/A',
+                port: port.port || 'N/A',
+                port_state: port.state || 'N/A',
+                service: port.service || 'N/A',
+                product: port.product || 'N/A',
+                version: port.version || 'N/A',
+                protocol: port.protocol || 'N/A',
+                banner: (port.product && port.version) ? 
+                        port.product + ' ' + port.version : 
+                        (port.product || port.version || 'N/A')
+            });
+        });
+    }
+});
+
 // 分页相关变量
 let currentPage = 1;
 let pageSize = 25;
 
+// 对比数据分页变量
+let diffPageState = {
+    added: { currentPage: 1, pageSize: 10 },
+    removed: { currentPage: 1, pageSize: 10 },
+    unchanged: { currentPage: 1, pageSize: 10 }
+};
+
 // 统计服务类型
 var serviceCounts = {};
-portsData.forEach(function(port) {
-    serviceCounts[port.name] = (serviceCounts[port.name] || 0) + 1;
+flatPortsData.forEach(function(port) {
+    var service = port.service || '未知';
+    serviceCounts[service] = (serviceCounts[service] || 0) + 1;
+});
+
+// 统计协议类型
+var protocolCounts = {};
+flatPortsData.forEach(function(port) {
+    var protocol = port.protocol || 'tcp';
+    protocolCounts[protocol] = (protocolCounts[protocol] || 0) + 1;
 });
 
 document.getElementById('exportButton').addEventListener('click', function() {
-    var wb = XLSX.utils.table_to_book(document.getElementById('portTable'), { sheet: "Sheet1" });
-    XLSX.writeFile(wb, 'port_table.xlsx');
+    // 创建新的工作簿
+    var wb = XLSX.utils.book_new();
+    
+    // 创建主端口数据工作表
+    var mainWs = XLSX.utils.json_to_sheet(flatPortsData.map(port => {
+        return {
+            '主机IP': port.host,
+            '主机名': port.hostname,
+            '主机状态': port.state,
+            '端口': port.port,
+            '端口状态': port.port_state,
+            '服务': port.service,
+            '产品': port.product,
+            '版本': port.version,
+            'Banner': port.banner
+        };
+    }));
+    XLSX.utils.book_append_sheet(wb, mainWs, "端口数据");
+    
+    // 如果有对比数据，创建对比数据工作表
+    if (diffData && typeof diffData === 'object' && Object.keys(diffData).length > 0) {
+        // 新增端口工作表
+        if (diffData.added_ports && diffData.added_ports.length > 0) {
+            var addedWs = XLSX.utils.json_to_sheet(diffData.added_ports.map(port => {
+                const host = (port.host || port.ip || 'N/A').toString();
+                const protocol = (port.protocol || port.agree || 'tcp').toString();
+                const portNumber = (port.port || 'N/A').toString();
+                const service = (port.service || port.name || 'unknown').toString();
+                
+                return {
+                    'IP地址': host,
+                    '协议': protocol,
+                    '端口': portNumber,
+                    '服务': service
+                };
+            }));
+            XLSX.utils.book_append_sheet(wb, addedWs, "新增端口");
+        }
+        
+        // 减少端口工作表
+        if (diffData.removed_ports && diffData.removed_ports.length > 0) {
+            var removedWs = XLSX.utils.json_to_sheet(diffData.removed_ports.map(port => {
+                const host = (port.host || port.ip || 'N/A').toString();
+                const protocol = (port.protocol || port.agree || 'tcp').toString();
+                const portNumber = (port.port || 'N/A').toString();
+                const service = (port.service || port.name || 'unknown').toString();
+                
+                return {
+                    'IP地址': host,
+                    '协议': protocol,
+                    '端口': portNumber,
+                    '服务': service
+                };
+            }));
+            XLSX.utils.book_append_sheet(wb, removedWs, "减少端口");
+        }
+        
+        // 保持不变的端口工作表
+        if (diffData.unchanged_ports && diffData.unchanged_ports.length > 0) {
+            var unchangedWs = XLSX.utils.json_to_sheet(diffData.unchanged_ports.map(port => {
+                const host = (port.host || port.ip || 'N/A').toString();
+                const protocol = (port.protocol || port.agree || 'tcp').toString();
+                const portNumber = (port.port || 'N/A').toString();
+                const service = (port.service || port.name || 'unknown').toString();
+                
+                return {
+                    'IP地址': host,
+                    '协议': protocol,
+                    '端口': portNumber,
+                    '服务': service
+                };
+            }));
+            XLSX.utils.book_append_sheet(wb, unchangedWs, "保持不变端口");
+        }
+    }
+    
+    // 如果有历史数据，创建历史数据工作表
+    if (historyData && historyData.length > 0) {
+        var historyWs = XLSX.utils.json_to_sheet(historyData.map(item => ({
+            '扫描时间': item.created_at,
+            '端口数量': item.port_count,
+            '任务ID': item.task_id
+        })));
+        XLSX.utils.book_append_sheet(wb, historyWs, "历史数据");
+    }
+    
+    // 导出文件
+    XLSX.writeFile(wb, '扫描结果数据.xlsx');
 });
 
 // 分页功能实现
 function renderTablePage() {
     const tbody = document.getElementById('portTableBody');
+    if (!tbody) return;
+    
     tbody.innerHTML = '';
     
     const start = (currentPage - 1) * pageSize;
     const end = start + pageSize;
-    const pageData = portsData.slice(start, end);
+    const pageData = flatPortsData.slice(start, end);
     
     pageData.forEach(function(port) {
         const row = document.createElement('tr');
         row.innerHTML = `
-            <td>${port.ip}</td>
-            <td>${port.agree}</td>
+            <td>${port.host}</td>
+            <td>${port.protocol}</td>
             <td>${port.port}</td>
-            <td>${port.name}</td>
+            <td>${port.service}</td>
             <td>${port.banner}</td>
         `;
         tbody.appendChild(row);
     });
     
     // 更新分页信息
-    const totalPages = Math.ceil(portsData.length / pageSize);
-    document.getElementById('pageInfo').textContent = `第 ${currentPage} 页，共 ${totalPages} 页`;
+    const totalPages = Math.ceil(flatPortsData.length / pageSize);
+    const pageInfo = document.getElementById('pageInfo');
+    if (pageInfo) {
+        pageInfo.textContent = `第 ${currentPage} 页，共 ${totalPages} 页`;
+    }
     
     // 更新按钮状态
-    document.getElementById('prevPage').disabled = currentPage === 1;
-    document.getElementById('nextPage').disabled = currentPage === totalPages;
+    const prevPage = document.getElementById('prevPage');
+    const nextPage = document.getElementById('nextPage');
+    if (prevPage) prevPage.disabled = currentPage === 1;
+    if (nextPage) nextPage.disabled = currentPage === totalPages;
+}
+
+// 对比数据分页功能实现
+function renderDiffTablePage(type) {
+    if (!diffData || typeof diffData !== 'object' || !diffData[`${type}_ports`]) return;
+    
+    const ports = diffData[`${type}_ports`];
+    const state = diffPageState[type];
+    const tbodyId = `${type}-ports-body`;
+    const tbody = document.getElementById(tbodyId);
+    if (!tbody) return;
+    
+    tbody.innerHTML = '';
+    
+    const start = (state.currentPage - 1) * state.pageSize;
+    const end = start + state.pageSize;
+    const pageData = ports.slice(start, end);
+    
+    pageData.forEach(function(port) {
+        const row = document.createElement('tr');
+        
+        // 提取并处理字段值，确保有合适的默认值
+        const host = (port.host || port.ip || 'N/A').toString();
+        const protocol = (port.protocol || port.agree || 'tcp').toString();
+        const portNumber = (port.port || 'N/A').toString();
+        const service = (port.service || port.name || 'unknown').toString();
+        
+        row.innerHTML = `
+            <td>${host}</td>
+            <td>${protocol}</td>
+            <td>${portNumber}</td>
+            <td>${service}</td>
+        `;
+        tbody.appendChild(row);
+    });
+    
+    // 更新分页信息
+    const totalPages = Math.ceil(ports.length / state.pageSize);
+    const pageInfo = document.querySelector(`.diff-page-info[data-type="${type}"]`);
+    if (pageInfo) {
+        pageInfo.textContent = `第 ${state.currentPage} 页，共 ${totalPages} 页`;
+    }
+    
+    // 更新按钮状态
+    const prevButton = document.querySelector(`.diff-prev-page[data-type="${type}"]`);
+    const nextButton = document.querySelector(`.diff-next-page[data-type="${type}"]`);
+    if (prevButton) prevButton.disabled = state.currentPage === 1;
+    if (nextButton) nextButton.disabled = state.currentPage === totalPages;
 }
 
 // 事件监听器
-document.getElementById('prevPage').addEventListener('click', function() {
-    if (currentPage > 1) {
-        currentPage--;
-        renderTablePage();
-    }
-});
-
-document.getElementById('nextPage').addEventListener('click', function() {
-    const totalPages = Math.ceil(portsData.length / pageSize);
-    if (currentPage < totalPages) {
-        currentPage++;
-        renderTablePage();
-    }
-});
-
-document.getElementById('pageSize').addEventListener('change', function() {
-    pageSize = parseInt(this.value);
-    currentPage = 1;
-    renderTablePage();
-});
-
-// 初始化图表
 document.addEventListener('DOMContentLoaded', function() {
-    // 初始化表格分页
-    renderTablePage();
-    
-    // 创建服务类型分布饼图
-    if (Object.keys(serviceCounts).length > 0) {
-        const serviceCtx = document.getElementById('serviceChart').getContext('2d');
-        const serviceChart = new Chart(serviceCtx, {
-            type: 'pie',
-            data: {
-                labels: Object.keys(serviceCounts),
-                datasets: [{
-                    data: Object.values(serviceCounts),
-                    backgroundColor: [
-                        'rgba(255, 99, 132, 0.8)',
-                        'rgba(54, 162, 235, 0.8)',
-                        'rgba(255, 205, 86, 0.8)',
-                        'rgba(75, 192, 192, 0.8)',
-                        'rgba(153, 102, 255, 0.8)',
-                        'rgba(255, 159, 64, 0.8)',
-                        'rgba(199, 199, 199, 0.8)'
-                    ],
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                responsive: true,
-                plugins: {
-                    legend: {
-                        position: 'top',
-                    },
-                    title: {
-                        display: true,
-                        text: '服务类型分布'
-                    }
+    const prevPage = document.getElementById('prevPage');
+    if (prevPage) {
+        prevPage.addEventListener('click', function() {
+            if (currentPage > 1) {
+                currentPage--;
+                renderTablePage();
+            }
+        });
+    }
+
+    const nextPage = document.getElementById('nextPage');
+    if (nextPage) {
+        nextPage.addEventListener('click', function() {
+            const totalPages = Math.ceil(flatPortsData.length / pageSize);
+            if (currentPage < totalPages) {
+                currentPage++;
+                renderTablePage();
+            }
+        });
+    }
+
+    const pageSizeSelect = document.getElementById('pageSize');
+    if (pageSizeSelect) {
+        pageSizeSelect.addEventListener('change', function() {
+            pageSize = parseInt(this.value);
+            currentPage = 1;
+            renderTablePage();
+        });
+    }
+
+    // 对比数据分页事件监听器
+    document.querySelectorAll('.diff-prev-page').forEach(button => {
+        button.addEventListener('click', function() {
+            const type = this.getAttribute('data-type');
+            if (diffPageState[type].currentPage > 1) {
+                diffPageState[type].currentPage--;
+                renderDiffTablePage(type);
+            }
+        });
+    });
+
+    document.querySelectorAll('.diff-next-page').forEach(button => {
+        button.addEventListener('click', function() {
+            const type = this.getAttribute('data-type');
+            if (diffData && diffData[`${type}_ports`]) {
+                const ports = diffData[`${type}_ports`];
+                const totalPages = Math.ceil(ports.length / diffPageState[type].pageSize);
+                if (diffPageState[type].currentPage < totalPages) {
+                    diffPageState[type].currentPage++;
+                    renderDiffTablePage(type);
                 }
             }
         });
+    });
+
+    document.querySelectorAll('.diff-page-size').forEach(select => {
+        select.addEventListener('change', function() {
+            const type = this.getAttribute('data-type');
+            diffPageState[type].pageSize = parseInt(this.value);
+            diffPageState[type].currentPage = 1;
+            renderDiffTablePage(type);
+        });
+    });
+});
+
+// 初始化图表和分页
+document.addEventListener('DOMContentLoaded', function() {
+    // 初始化主表格分页
+    renderTablePage();
+    
+    // 初始化对比数据分页
+    if (diffData && typeof diffData === 'object' && Object.keys(diffData).length > 0) {
+        renderDiffTablePage('added');
+        renderDiffTablePage('removed');
+        renderDiffTablePage('unchanged');
+    }
+    
+    // 创建服务类型分布饼图
+    const serviceCtx = document.getElementById('serviceChart');
+    if (serviceCtx) {
+        const ctx = serviceCtx.getContext('2d');
+        if (ctx) {
+            // 过滤掉数据为0的标签
+            const filteredLabels = Object.keys(serviceCounts).filter(label => serviceCounts[label] > 0);
+            const filteredData = filteredLabels.map(label => serviceCounts[label]);
+            
+            if (filteredData.length > 0) {
+                const serviceChart = new Chart(ctx, {
+                    type: 'pie',
+                    data: {
+                        labels: filteredLabels,
+                        datasets: [{
+                            data: filteredData,
+                            backgroundColor: [
+                                'rgba(255, 99, 132, 0.8)',
+                                'rgba(54, 162, 235, 0.8)',
+                                'rgba(255, 205, 86, 0.8)',
+                                'rgba(75, 192, 192, 0.8)',
+                                'rgba(153, 102, 255, 0.8)',
+                                'rgba(255, 159, 64, 0.8)',
+                                'rgba(199, 199, 199, 0.8)'
+                            ].slice(0, filteredLabels.length).concat([
+                                'rgba(255, 99, 132, 0.8)',
+                                'rgba(54, 162, 235, 0.8)',
+                                'rgba(255, 205, 86, 0.8)',
+                                'rgba(75, 192, 192, 0.8)',
+                                'rgba(153, 102, 255, 0.8)',
+                                'rgba(255, 159, 64, 0.8)',
+                                'rgba(199, 199, 199, 0.8)'
+                            ]), // 确保有足够的颜色
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: {
+                                position: 'top',
+                            },
+                            title: {
+                                display: true,
+                                text: '服务类型分布'
+                            }
+                        }
+                    }
+                });
+            } else {
+                // 如果没有数据，显示提示信息
+                serviceCtx.style.display = 'none';
+                const parent = serviceCtx.parentElement;
+                if (parent) {
+                    parent.innerHTML += '<p class="text-center text-muted">暂无服务类型数据</p>';
+                }
+            }
+        }
     }
     
     // 创建端口变化趋势图
-    if (historyData.length > 0) {
-        // 准备趋势图数据
-        const trendLabels = historyData.map(item => item.created_at);
-        const trendData = historyData.map(item => item.port_count);
-        
-        const trendCtx = document.getElementById('trendChart').getContext('2d');
-        const trendChart = new Chart(trendCtx, {
-            type: 'line',
-            data: {
-                labels: trendLabels,
-                datasets: [{
-                    label: '端口数量',
-                    data: trendData,
-                    borderColor: 'rgb(75, 192, 192)',
-                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                    tension: 0.1,
-                    fill: true
-                }]
-            },
-            options: {
-                responsive: true,
-                plugins: {
-                    legend: {
-                        position: 'top',
+    const trendCtx = document.getElementById('trendChart');
+    if (trendCtx) {
+        if (historyData && historyData.length > 0) {
+            // 准备趋势图数据
+            const trendLabels = historyData.map(item => item.created_at);
+            const trendData = historyData.map(item => item.port_count);
+            
+            const ctx = trendCtx.getContext('2d');
+            if (ctx) {
+                const trendChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: trendLabels,
+                        datasets: [{
+                            label: '端口数量',
+                            data: trendData,
+                            borderColor: 'rgb(75, 192, 192)',
+                            backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                            tension: 0.1,
+                            fill: true
+                        }]
                     },
-                    title: {
-                        display: true,
-                        text: '端口变化趋势'
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: {
+                                position: 'top',
+                            },
+                            title: {
+                                display: true,
+                                text: '端口变化趋势'
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            }
+                        }
                     }
-                },
-                scales: {
-                    y: {
-                        beginAtZero: true
-                    }
-                }
+                });
             }
-        });
+        } else {
+            // 如果没有历史数据，显示提示信息
+            trendCtx.style.display = 'none';
+            const parent = trendCtx.parentElement;
+            if (parent) {
+                parent.innerHTML += '<p class="text-center text-muted">暂无历史数据用于趋势分析</p>';
+            }
+        }
     }
 });
 </script>

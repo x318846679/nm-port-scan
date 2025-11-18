@@ -6,73 +6,221 @@
         <title>UDP端口扫描器</title>
         <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}"
             rel="stylesheet">
+        <link href="{{ url_for('static', filename='css/all.css') }}"
+            rel="stylesheet">
         <style>
-        body {
-            font-family: 'Arial', sans-serif;
-            background-color: #f0f0f0;
+        :root {
+            --primary-color: #4361ee;
+            --secondary-color: #3f37c9;
+            --success-color: #4cc9f0;
+            --dark-color: #212529;
+            --light-color: #f8f9fa;
+            --sidebar-width: 250px;
         }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f2f5;
+            color: #333;
+        }
+        
         .sidebar {
             height: 100vh;
-            width: 200px;
+            width: var(--sidebar-width);
             position: fixed;
             top: 0;
             left: 0;
-            background-color: #343a40;
+            background: linear-gradient(180deg, #343a40 0%, #212529 100%);
             color: #ffffff;
             padding-top: 20px;
+            box-shadow: 3px 0 10px rgba(0,0,0,0.1);
+            z-index: 1000;
         }
+        
         .sidebar h2 {
             text-align: center;
             color: #ffffff;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #495057;
+            margin-bottom: 20px;
         }
+        
         .sidebar .nav-link {
+            color: #adb5bd;
+            padding: 12px 20px;
+            margin: 5px 15px;
+            border-radius: 5px;
+            transition: all 0.3s ease;
+        }
+        
+        .sidebar .nav-link:hover, 
+        .sidebar .nav-link.active {
+            background-color: var(--primary-color);
             color: #ffffff;
         }
-        .sidebar .nav-link:hover {
-            background-color: #495057;
+        
+        .sidebar .nav-link i {
+            margin-right: 10px;
+            width: 20px;
+            text-align: center;
         }
+        
         .content {
-            margin-left: 220px;
+            margin-left: var(--sidebar-width);
             padding: 20px;
+            min-height: 100vh;
+        }
+        
+        .header {
+            background: linear-gradient(90deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        .card {
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            border: none;
+            margin-bottom: 20px;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.1);
+        }
+        
+        .card-header {
+            background-color: white;
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+            font-weight: 600;
+            padding: 15px 20px;
+            border-radius: 10px 10px 0 0 !important;
+        }
+        
+        .btn-primary {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+        
+        .btn-primary:hover {
+            background-color: var(--secondary-color);
+            border-color: var(--secondary-color);
+        }
+        
+        .table {
+            background-color: white;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        
+        .table th {
+            background-color: #e9ecef;
+        }
+        
+        footer {
+            text-align: center;
+            padding: 20px;
+            color: #6c757d;
+            font-size: 0.9em;
+            margin-top: 30px;
+        }
+        
+        .badge-primary {
+            background-color: var(--primary-color);
+        }
+        
+        .progress {
+            height: 10px;
+            border-radius: 5px;
+        }
+        
+        .user-info {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            color: #adb5bd;
+            font-size: 0.9em;
         }
     </style>
     </head>
     <body>
         <div class="sidebar">
-            <h2>导航</h2>
+            <h2><i class="anticon anticon-shield"></i> 端口扫描器</h2>
             <ul class="nav flex-column">
                 <li class="nav-item">
-                    <a class="nav-link" href="/">创建任务</a>
+                    <a class="nav-link" href="{{ url_for('index') }}">
+                        <i class="anticon anticon-plus-circle"></i> 创建任务
+                    </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link" href="/tasks">任务列表</a>
+                    <a class="nav-link" href="{{ url_for('tasks_list') }}">
+                        <i class="anticon anticon-tasks"></i> 任务列表
+                    </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link" href="/assets">资产管理</a>
+                    <a class="nav-link" href="{{ url_for('asset_center') }}">
+                        <i class="anticon anticon-database"></i> 资产中心
+                    </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link" href="/templates">参数模板</a>
+                    <a class="nav-link" href="{{ url_for('assets') }}">
+                        <i class="anticon anticon-server"></i> 资产管理
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ url_for('templates') }}">
+                        <i class="anticon anticon-file-code"></i> 参数模板
+                    </a>
                 </li>
                 {% if session.get('role') == 'admin' %}
                 <li class="nav-item">
-                    <a class="nav-link" href="/users">用户管理</a>
+                    <a class="nav-link" href="{{ url_for('manage_users') }}">
+                        <i class="anticon anticon-users"></i> 用户管理
+                    </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link" href="/email">邮箱管理</a>
+                    <a class="nav-link" href="{{ url_for('email_settings') }}">
+                        <i class="anticon anticon-envelope"></i> 邮箱设置
+                    </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link" href="/access-log">访问日志</a>
+                    <a class="nav-link" href="{{ url_for('access_log') }}">
+                        <i class="anticon anticon-history"></i> 访问日志
+                    </a>
                 </li>
                 {% endif %}
                 <li class="nav-item">
                     <a class="nav-link" href="{{ url_for('logout') }}">
-                        退出登录
+                        <i class="anticon anticon-sign-out-alt"></i> 退出登录
                     </a>
                 </li>
             </ul>
+            <div class="user-info">
+                <div>用户: {{ session.username }}</div>
+                <div>角色: {{ session.role }}</div>
+            </div>
         </div>
         <div class="content">
+            {% with messages = get_flashed_messages() %}
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert alert-info alert-dismissible fade show" role="alert">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+            
             {% block content %}{% endblock %}
+            
+            <footer>
+                <p>&copy; 2025 端口扫描器系统. 保留所有权利.</p>
+            </footer>
         </div>
         <script
             src="{{ url_for('static', filename='js/jquery.min.js') }}"></script>

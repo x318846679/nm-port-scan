@@ -3,7 +3,7 @@
 {% block content %}
 <div class="container mt-4">
     <h2>邮箱管理</h2>
-    <form id="user-form" method="POST" class="mb-4">
+    <form id="email-form" method="POST" class="mb-4">
         {{ form.hidden_tag() }}
         <div class="mb-3">
             {{ form.host.label(class="form-label") }}
@@ -31,10 +31,14 @@
             <h3>邮箱配置信息</h3>
         </div>
         <div class="card-body">
+            {% if email_setting %}
             <p><strong>SMTP服务器地址:</strong> {{ email_setting.host }}</p>
-            <p><strong>SMPT服务器端口:</strong> {{ email_setting.port }}</p>
-            <p><strong>EMail账户:</strong> {{ email_setting.user }}</p>
-            <p><strong>Email密码:</strong> {{ email_setting.passwd }}</p>
+            <p><strong>SMTP服务器端口:</strong> {{ email_setting.port }}</p>
+            <p><strong>Email账户:</strong> {{ email_setting.user }}</p>
+            <p><strong>Email密码:</strong> {{ '*' * email_setting.passwd|length }}</p>
+            {% else %}
+            <p>尚未配置邮箱信息</p>
+            {% endif %}
         </div>
     </div>
     
