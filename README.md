@@ -44,7 +44,6 @@ python app.py 运行程序
 
 创建任务时，可以设置任务的执行间隔（分钟），系统会根据间隔时间定时执行任务。
 
-<img width="2775" height="1414" alt="image" src="https://github.com/user-attachments/assets/b562822f-0cf0-4d73-ba8b-9e11c87d9c0d" />
 
 开发者信息
 作者：SpiderMan
