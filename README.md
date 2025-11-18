@@ -11,6 +11,8 @@
 - 用户管理与权限控制
 - 登录日志与访问记录
 
+<img width="2775" height="1414" alt="image" src="https://github.com/user-attachments/assets/c79c18f3-78aa-453c-b228-0e3612b0b3a5" />
+
 ## 功能特性
 
 - **任务管理**：用户可以创建、执行、终止和删除端口扫描任务。
