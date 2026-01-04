@@ -153,9 +153,7 @@
                     <div class="col-md-6">
                         <h5>扫描目标</h5>
                         <div class="bg-light p-3 rounded">
-                            {% for ip in task.ips.split('\n') %}
-                                <span class="badge bg-secondary me-1 mb-1">{{ ip }}</span>
-                            {% endfor %}
+                            <textarea class="form-control" rows="10" style="font-size: 0.8em;" readonly>{{ task.ips }}</textarea>
                         </div>
                     </div>
                 </div>

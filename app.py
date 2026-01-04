@@ -23,6 +23,8 @@ import json
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment
 from openpyxl.utils import get_column_letter
+from sqlalchemy import create_engine
+from sqlalchemy.pool import StaticPool
 
 
 # 创建线程池执行器
@@ -35,17 +37,17 @@ app.config['SECRET_KEY'] = 'your-secret-key'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///nm_scan.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-db = SQLAlchemy(app)
-
-# 添加SQLite多线程支持配置到app.config中
+# 配置SQLite多线程支持
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-    'poolclass': db.pool.StaticPool,
+    'poolclass': StaticPool,
     'pool_pre_ping': True,
     'pool_recycle': 300,
     'connect_args': {
         'check_same_thread': False
     }
 }
+
+db = SQLAlchemy(app)
 
 # Initialize Flask-Login
 login_manager = LoginManager()
