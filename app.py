@@ -37,6 +37,16 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
+# 添加SQLite多线程支持配置到app.config中
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'poolclass': db.pool.StaticPool,
+    'pool_pre_ping': True,
+    'pool_recycle': 300,
+    'connect_args': {
+        'check_same_thread': False
+    }
+}
+
 # Initialize Flask-Login
 login_manager = LoginManager()
 login_manager.init_app(app)
